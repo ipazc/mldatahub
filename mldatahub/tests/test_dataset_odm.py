@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+__author__ = 'Iván de Paz Centeno'
+
+import unittest
+from mldatahub.config.config import global_config
+global_config.set_session_uri("mongodb://localhost:27017/unittests")
+from mldatahub.odm.dataset import Dataset, DatasetComment, DatasetElement, DatasetElementComment, taken_url_prefixes
+
+
+class TestDatasetODM(unittest.TestCase):
+
+    def setUp(self):
+        self.session = global_config.get_session()
+
+    def test_create_remove_dataset(self):
+        """
+        Dataset creation and removal works successfully.
+        :return:
+        """
+        dataset = Dataset("ip/asd", "example", "desc", "none")
+
+        self.assertTrue(dataset.title, "example")
+        self.assertTrue(dataset.description, "desc")
+        self.assertTrue(dataset.reference, "none")
+
+        self.session.flush()
+
+        dataset2 = Dataset.query.get(title="example")
+
+        self.assertEqual(dataset.title, dataset2.title)
+        self.assertEqual(dataset.description, dataset2.description)
+        self.assertEqual(dataset.reference, dataset2.reference)
+
+        dataset.delete()
+        self.session.flush()
+
+        dataset3 = Dataset.query.get(title='example')
+        self.assertIsNone(dataset3)
+
+    def test_create_dataset_add_remove_comment(self):
+        """
+        Dataset creation and removal of comments works successfully.
+        :return:
+        """
+        dataset = Dataset("ip/asd2", "example", "desc", "none")
+        print("here")
+        dataset.add_comment("ivan", "1", "11")
+        dataset.add_comment("ivan", "1", "21")
+        dataset.add_comment("ivan", "1", "11")
+
+        self.session.flush()
+
+        dataset2 = Dataset.query.get(title="example")
+
+        self.assertEqual(len(dataset2.comments), 3)
+        self.assertEqual(dataset2.comments[0].author_name, "ivan")
+        self.assertEqual(dataset2.comments[1].author_name, "ivan")
+        self.assertEqual(dataset2.comments[2].author_name, "ivan")
+
+        dataset.comments[0].delete()
+
+        self.session.flush()
+        self.session.clear()
+
+        dataset3 = Dataset.query.get(title="example")
+
+        self.assertEqual(len(dataset3.comments), 2)
+
+        comment = DatasetComment.query.get(author_name="ivan")
+
+        self.assertEqual(comment.dataset_id, dataset._id)
+
+        dataset.delete()
+        comment = DatasetComment.query.get(author_name="ivan")
+        self.assertIsNone(comment)
+
+    def test_create_dataset_add_remove_element(self):
+        """
+        Dataset creation and removal of elements works successfully.
+        :return:
+        """
+        dataset = Dataset("ip/asd3", "example", "for content", "unknown")
+
+        dataset.add_element("ele1", "description of the element.", 0, tags=["tag1", "tag2"])
+        dataset.add_element("ele2", "description of the element.", 1, tags=["tag1"])
+        self.session.flush()
+        self.session.clear()
+        self.assertEqual(len(dataset.elements), 2)
+
+        element = DatasetElement.query.get(tags="tag2")
+        self.assertEqual(element.title, "ele1")
+
+        element.delete()
+        self.session.flush()
+        self.session.clear()
+
+        element = DatasetElement.query.get(tags="tag2")
+        self.assertIsNone(element)
+        element = DatasetElement.query.get(tags="tag1")
+        self.assertEqual(element.title, "ele2")
+
+        dataset.delete()
+
+        element = DatasetElement.query.get(tags="tag1")
+        self.assertIsNone(element)
+
+    def test_create_dataset_element_add_remove_comment(self):
+        """
+        Dataset creation and removal of comments from elements works successfully.
+        :return:
+        """
+        dataset = Dataset("ip/asd4", "example", "desc", "none")
+
+        element = dataset.add_element("ele1", "description of the element.", 0, tags=["tag1", "tag2"])
+        element2 = dataset.add_element("ele2", "description of the element2.", 1, tags=["tag1", "tag2"])
+
+        element.add_comment("ivan", "1", "11")
+        element.add_comment("ivan", "1", "21")
+        element.add_comment("ivan", "1", "11")
+        self.session.flush()
+
+        self.assertEqual(len(element.comments), 3)
+        self.assertEqual(len(element2.comments), 0)
+        self.assertEqual(element.comments[0].author_name, "ivan")
+        self.assertEqual(element.comments[1].author_name, "ivan")
+        self.assertEqual(element.comments[2].author_name, "ivan")
+
+        element.comments[0].delete()
+
+        self.session.flush_all()
+        self.session.clear()
+
+        element2 = DatasetElement.query.get(title="ele1")
+
+        self.assertEqual(len(element2.comments), 2)
+
+        comment = DatasetElementComment.query.get(author_name="ivan")
+
+        self.assertEqual(comment.element_id, element2._id)
+
+        element.delete()
+
+        self.session.flush()
+        self.session.clear()
+
+        comment = DatasetElementComment.query.get(author_name="ivan")
+        self.assertIsNone(comment)
+        dataset.delete()
+
+    def test_url_prefix_duplication_error(self):
+        """
+        Tests that a duplicated url prefix cannot be retrieved.
+        :return:
+        """
+        dataset = Dataset("ip/asd5", "example", "desc", "none")
+
+        with self.assertRaises(Exception) as ex:
+            dataset2 = Dataset("ip/asd5", "example", "desc", "none")
+
+    def test_url_prefix_can_be_reutilized_on_delete(self):
+        """
+        Tests that a url prefix can be reutilized.
+        :return:
+        """
+        dataset = Dataset("ip/asd5", "example", "desc", "none")
+
+        dataset.delete()
+
+        dataset2 = Dataset("ip/asd5", "example", "desc", "none")
+        self.assertEqual(dataset2.url_prefix, "ip/asd5")
+
+    def tearDown(self):
+        Dataset.query.remove()
+        DatasetComment.query.remove()
+        DatasetElement.query.remove()
+        DatasetElementComment.query.remove()
+        taken_url_prefixes.clear()
+
+if __name__ == '__main__':
+    unittest.main()
