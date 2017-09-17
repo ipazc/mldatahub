@@ -36,7 +36,6 @@ class Dataset(MappedClass):
             if previous_dset is not None or url_prefix in taken_url_prefixes:
                 raise Exception("Url prefix already taken.")
             else:
-                print("registering {}".format(url_prefix))
                 taken_url_prefixes[url_prefix] = 1
 
         kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__"]}
@@ -47,10 +46,10 @@ class Dataset(MappedClass):
         return cls(**init_dict)
 
     def add_comment(self, author_name, author_link, content, addition_date=now()):
-        return DatasetComment(author_name, author_link, content, addition_date, self._id)
+        return DatasetComment(author_name, author_link, content, addition_date, dataset=self)
 
     def add_element(self, title, description, file_ref_id, tags=None, addition_date=now(), modification_date=now()):
-        return DatasetElement(title, description, file_ref_id, tags, addition_date, modification_date, self._id)
+        return DatasetElement(title, description, file_ref_id, tags, addition_date, modification_date, dataset=self)
 
     def delete(self):
         url_prefix = self.url_prefix
@@ -60,11 +59,12 @@ class Dataset(MappedClass):
         DatasetComment.query.remove({'dataset_id': self._id})
         DatasetElement.query.remove({'dataset_id': self._id})
 
-        super().delete()
+        Dataset.query.remove({'_id': self._id})
 
         with lock:
             if url_prefix in taken_url_prefixes:
                 del taken_url_prefixes[url_prefix]
+
 
 class DatasetElement(MappedClass):
 
@@ -95,10 +95,11 @@ class DatasetElement(MappedClass):
         return cls(**init_dict)
 
     def add_comment(self, author_name, author_link, content, addition_date=now()):
-        return DatasetElementComment(author_name, author_link, content, addition_date, self._id)
+        return DatasetElementComment(author_name, author_link, content, addition_date, element=self)
 
     def delete(self):
         DatasetElementComment.query.remove({'element_id': self._id})
+        DatasetElement.query.remove({'_id': self._id})
         super().delete()
 
 class DatasetComment(MappedClass):
@@ -126,6 +127,10 @@ class DatasetComment(MappedClass):
     def from_dict(cls, init_dict):
         return cls(**init_dict)
 
+    def delete(self):
+        DatasetComment.query.remove({'_id': self._id})
+
+
 
 class DatasetElementComment(MappedClass):
 
@@ -152,6 +157,9 @@ class DatasetElementComment(MappedClass):
     def from_dict(cls, init_dict):
         return cls(**init_dict)
 
+    def delete(self):
+        DatasetElementComment.query.remove({'_id': self._id})
+        MappedClass.delete(self)
 
 from ming.odm import Mapper
 Mapper.compile_all()
