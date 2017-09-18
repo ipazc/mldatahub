@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from flask import request
-from flask_restful import reqparse, Resource, abort
+from flask_restful import reqparse, abort
 from mldatahub.api.tokenized_resource import TokenizedResource
 
 from mldatahub.config.config import now, global_config
@@ -133,13 +132,6 @@ class Token(TokenizedResource):
             self.get_parser.add_argument(argument, **kwargs)
 
         arguments = {
-            "dataset_url_prefixes":
-            {
-                "type": list,
-                "required": False,
-                "help": "URL prefixes for the linked datasets to this token.",
-                "location": "json"
-            },
             "description":
             {
                 "type": str,
@@ -179,7 +171,13 @@ class Token(TokenizedResource):
                 "type": str,
                 "help": "Token GUI, if not specified a new one is generated.",
                 "location": "json"
-            }
+            },
+            "url_prefix":
+            {
+                "type": str,
+                "help": "Token URL prefix.",
+                "location": "json"
+            },
         }
 
         for argument, kwargs in arguments.items():
@@ -197,25 +195,20 @@ class Token(TokenizedResource):
 
         view_token = TokenFactory(token).get_token(token_id)
 
-        return view_token.serialize()
+        return view_token.serialize(), 201
 
-    def post(self, token_obj):
+    def post(self, token_id):
         required_any_privileges = [
-            Privileges.ADMIN_EDIT_TOKEN
+            Privileges.ADMIN_EDIT_TOKEN,
+            Privileges.USER_EDIT_TOKEN
         ]
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_any_privileges)
         args = self.get_parser.parse_args()
 
-        if token_obj != token.token_gui:
+        if token_id != token.token_gui:
             abort(401)
 
-        edit_token = TokenDAO.query.get(token_gui=token_obj)
+        edited_token = TokenFactory(token).edit_token(token_id, **args)
 
-        try:
-            for token_arg, value in args.items():
-                edit_token[token_arg] = value
-        except Exception as ex:
-            abort(400)
-
-        return edit_token.serialize()
+        return edited_token.serialize(), 201

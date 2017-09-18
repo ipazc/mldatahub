@@ -78,7 +78,7 @@ class TokenDAO(MappedClass):
     def serialize(self):
         fields = ["token_gui", "url_prefix", "description", "max_dataset_count",
                   "max_dataset_size", "creation_date",
-                  "modification_date", "end_date"]
+                  "modification_date", "end_date", "privileges"]
 
         return {f: str(self[f]) for f in fields}
 
