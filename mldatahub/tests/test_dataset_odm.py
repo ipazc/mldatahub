@@ -7,17 +7,17 @@ __author__ = 'Iván de Paz Centeno'
 import unittest
 from mldatahub.config.config import global_config
 global_config.set_session_uri("mongodb://localhost:27017/unittests")
-from mldatahub.odm.dataset import Dataset, DatasetComment, DatasetElement, DatasetElementComment, taken_url_prefixes
+from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO, taken_url_prefixes
 
 
 class TestDatasetODM(unittest.TestCase):
 
     def setUp(self):
         self.session = global_config.get_session()
-        Dataset.query.remove()
-        DatasetComment.query.remove()
-        DatasetElement.query.remove()
-        DatasetElementComment.query.remove()
+        DatasetDAO.query.remove()
+        DatasetCommentDAO.query.remove()
+        DatasetElementDAO.query.remove()
+        DatasetElementCommentDAO.query.remove()
         taken_url_prefixes.clear()
 
     def test_create_remove_dataset(self):
@@ -25,7 +25,7 @@ class TestDatasetODM(unittest.TestCase):
         Dataset creation and removal works successfully.
         :return:
         """
-        dataset = Dataset("ip/asd", "example1", "desc", "none")
+        dataset = DatasetDAO("ip/asd", "example1", "desc", "none")
 
         self.assertTrue(dataset.title, "example")
         self.assertTrue(dataset.description, "desc")
@@ -33,7 +33,7 @@ class TestDatasetODM(unittest.TestCase):
 
         self.session.flush()
 
-        dataset2 = Dataset.query.get(title="example1")
+        dataset2 = DatasetDAO.query.get(title="example1")
 
         self.assertEqual(dataset.title, dataset2.title)
         self.assertEqual(dataset.description, dataset2.description)
@@ -42,7 +42,7 @@ class TestDatasetODM(unittest.TestCase):
         dataset.delete()
         self.session.flush()
 
-        dataset3 = Dataset.query.get(title='example1')
+        dataset3 = DatasetDAO.query.get(title='example1')
         self.assertIsNone(dataset3)
 
     def test_create_dataset_add_remove_comment(self):
@@ -50,7 +50,7 @@ class TestDatasetODM(unittest.TestCase):
         Dataset creation and removal of comments works successfully.
         :return:
         """
-        dataset = Dataset("ip/asd2", "example2", "desc", "none")
+        dataset = DatasetDAO("ip/asd2", "example2", "desc", "none")
 
         c1 = dataset.add_comment("ivan", "1", "11")
         c2 = dataset.add_comment("ivan", "1", "21")
@@ -58,7 +58,7 @@ class TestDatasetODM(unittest.TestCase):
 
         self.session.flush()
 
-        dataset2 = Dataset.query.get(title="example2")
+        dataset2 = DatasetDAO.query.get(title="example2")
 
         self.session.refresh(dataset2)
         self.assertEqual(len(dataset2.comments), 3)
@@ -70,16 +70,16 @@ class TestDatasetODM(unittest.TestCase):
 
         self.session.flush()
 
-        dataset3 = Dataset.query.get(title="example2")
+        dataset3 = DatasetDAO.query.get(title="example2")
 
         self.assertEqual(len(dataset3.comments), 2)
 
-        comment = DatasetComment.query.get(author_name="ivan")
+        comment = DatasetCommentDAO.query.get(author_name="ivan")
 
         self.assertEqual(comment.dataset_id, dataset._id)
 
         dataset.delete()
-        comment = DatasetComment.query.get(author_name="ivan")
+        comment = DatasetCommentDAO.query.get(author_name="ivan")
         self.assertIsNone(comment)
 
     def test_create_dataset_add_remove_element(self):
@@ -87,27 +87,27 @@ class TestDatasetODM(unittest.TestCase):
         Dataset creation and removal of elements works successfully.
         :return:
         """
-        dataset = Dataset("ip/asd3", "example3", "for content", "unknown")
+        dataset = DatasetDAO("ip/asd3", "example3", "for content", "unknown")
 
         dataset.add_element("ele1", "description of the element.", 0, tags=["tag1", "tag2"])
         dataset.add_element("ele2", "description of the element.", 1, tags=["tag1"])
         self.session.flush()
         self.assertEqual(len(dataset.elements), 2)
 
-        element = DatasetElement.query.get(tags="tag2")
+        element = DatasetElementDAO.query.get(tags="tag2")
         self.assertEqual(element.title, "ele1")
 
         element.delete()
         self.session.flush()
 
-        element = DatasetElement.query.get(tags="tag2")
+        element = DatasetElementDAO.query.get(tags="tag2")
         self.assertIsNone(element)
-        element = DatasetElement.query.get(tags="tag1")
+        element = DatasetElementDAO.query.get(tags="tag1")
         self.assertEqual(element.title, "ele2")
 
         dataset.delete()
 
-        element = DatasetElement.query.get(tags="tag1")
+        element = DatasetElementDAO.query.get(tags="tag1")
         self.assertIsNone(element)
 
     def test_create_dataset_element_add_remove_comment(self):
@@ -115,7 +115,7 @@ class TestDatasetODM(unittest.TestCase):
         Dataset creation and removal of comments from elements works successfully.
         :return:
         """
-        dataset = Dataset("ip/asd4", "example4", "desc", "none")
+        dataset = DatasetDAO("ip/asd4", "example4", "desc", "none")
 
         element = dataset.add_element("ele1", "description of the element.", 0, tags=["tag1", "tag2"])
         element2 = dataset.add_element("ele2", "description of the element2.", 1, tags=["tag1", "tag2"])
@@ -139,12 +139,12 @@ class TestDatasetODM(unittest.TestCase):
         self.session.flush()
         self.session.clear()
 
-        element = DatasetElement.query.get(title="ele1")
+        element = DatasetElementDAO.query.get(title="ele1")
         self.session.refresh(element)
 
         self.assertEqual(len(element.comments), 2)
 
-        comment = DatasetElementComment.query.get(author_name="ivan")
+        comment = DatasetElementCommentDAO.query.get(author_name="ivan")
 
         self.assertEqual(comment.element_id, element._id)
 
@@ -152,7 +152,7 @@ class TestDatasetODM(unittest.TestCase):
 
         self.session.flush()
 
-        comment = DatasetElementComment.query.get(author_name="ivan")
+        comment = DatasetElementCommentDAO.query.get(author_name="ivan")
         self.assertIsNone(comment)
         dataset.delete()
 
@@ -161,28 +161,28 @@ class TestDatasetODM(unittest.TestCase):
         Tests that a duplicated url prefix cannot be retrieved.
         :return:
         """
-        dataset = Dataset("ip/asd5", "example5", "desc", "none")
+        dataset = DatasetDAO("ip/asd5", "example5", "desc", "none")
 
         with self.assertRaises(Exception) as ex:
-            dataset2 = Dataset("ip/asd5", "example5", "desc", "none")
+            dataset2 = DatasetDAO("ip/asd5", "example5", "desc", "none")
 
     def test_url_prefix_can_be_reutilized_on_delete(self):
         """
         Tests that a url prefix can be reutilized.
         :return:
         """
-        dataset = Dataset("ip/asd5", "example6", "desc", "none")
+        dataset = DatasetDAO("ip/asd5", "example6", "desc", "none")
 
         dataset.delete()
 
-        dataset2 = Dataset("ip/asd5", "example6", "desc", "none")
+        dataset2 = DatasetDAO("ip/asd5", "example6", "desc", "none")
         self.assertEqual(dataset2.url_prefix, "ip/asd5")
 
     def tearDown(self):
-        Dataset.query.remove()
-        DatasetComment.query.remove()
-        DatasetElement.query.remove()
-        DatasetElementComment.query.remove()
+        DatasetDAO.query.remove()
+        DatasetCommentDAO.query.remove()
+        DatasetElementDAO.query.remove()
+        DatasetElementCommentDAO.query.remove()
         taken_url_prefixes.clear()
 
 if __name__ == '__main__':

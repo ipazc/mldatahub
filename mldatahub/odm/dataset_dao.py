@@ -13,7 +13,7 @@ lock = Lock()
 session = global_config.get_session()
 
 
-class Dataset(MappedClass):
+class DatasetDAO(MappedClass):
 
     class __mongometa__:
         session = session
@@ -26,13 +26,13 @@ class Dataset(MappedClass):
     reference = FieldProperty(schema.String)
     creation_date = FieldProperty(schema.datetime)
     modification_date = FieldProperty(schema.datetime)
-    elements = RelationProperty('DatasetElement')
-    comments = RelationProperty('DatasetComment')
-    tokens = RelationProperty('Token')
+    elements = RelationProperty('DatasetElementDAO')
+    comments = RelationProperty('DatasetCommentDAO')
+    tokens = RelationProperty('TokenDAO')
 
     def __init__(self, url_prefix, title, description, reference, creation_date=now(), modification_date=now()):
         with lock:
-            previous_dset = Dataset.query.get(url_prefix=url_prefix)
+            previous_dset = DatasetDAO.query.get(url_prefix=url_prefix)
             if previous_dset is not None or url_prefix in taken_url_prefixes:
                 raise Exception("Url prefix already taken.")
             else:
@@ -46,27 +46,27 @@ class Dataset(MappedClass):
         return cls(**init_dict)
 
     def add_comment(self, author_name, author_link, content, addition_date=now()):
-        return DatasetComment(author_name, author_link, content, addition_date, dataset=self)
+        return DatasetCommentDAO(author_name, author_link, content, addition_date, dataset=self)
 
     def add_element(self, title, description, file_ref_id, tags=None, addition_date=now(), modification_date=now()):
-        return DatasetElement(title, description, file_ref_id, tags, addition_date, modification_date, dataset=self)
+        return DatasetElementDAO(title, description, file_ref_id, tags, addition_date, modification_date, dataset=self)
 
     def delete(self):
         url_prefix = self.url_prefix
         for dataset_element in self.elements:
             dataset_element.delete()
 
-        DatasetComment.query.remove({'dataset_id': self._id})
-        DatasetElement.query.remove({'dataset_id': self._id})
+        DatasetCommentDAO.query.remove({'dataset_id': self._id})
+        DatasetElementDAO.query.remove({'dataset_id': self._id})
 
-        Dataset.query.remove({'_id': self._id})
+        DatasetDAO.query.remove({'_id': self._id})
 
         with lock:
             if url_prefix in taken_url_prefixes:
                 del taken_url_prefixes[url_prefix]
 
 
-class DatasetElement(MappedClass):
+class DatasetElementDAO(MappedClass):
 
     class __mongometa__:
         session = session
@@ -79,9 +79,9 @@ class DatasetElement(MappedClass):
     tags = FieldProperty(schema.Array(schema.String))
     addition_date = FieldProperty(schema.datetime)
     modification_date = FieldProperty(schema.datetime)
-    comments = RelationProperty('DatasetElementComment')
-    dataset_id = ForeignIdProperty('Dataset')
-    dataset = RelationProperty('Dataset')
+    comments = RelationProperty('DatasetElementCommentDAO')
+    dataset_id = ForeignIdProperty('DatasetDAO')
+    dataset = RelationProperty('DatasetDAO')
 
     def __init__(self, title, description, file_ref_id, tags=None, addition_date=now(), modification_date=now(), dataset_id=None, dataset=None):
         if dataset_id is None and dataset is not None:
@@ -95,14 +95,14 @@ class DatasetElement(MappedClass):
         return cls(**init_dict)
 
     def add_comment(self, author_name, author_link, content, addition_date=now()):
-        return DatasetElementComment(author_name, author_link, content, addition_date, element=self)
+        return DatasetElementCommentDAO(author_name, author_link, content, addition_date, element=self)
 
     def delete(self):
-        DatasetElementComment.query.remove({'element_id': self._id})
-        DatasetElement.query.remove({'_id': self._id})
+        DatasetElementCommentDAO.query.remove({'element_id': self._id})
+        DatasetElementDAO.query.remove({'_id': self._id})
         super().delete()
 
-class DatasetComment(MappedClass):
+class DatasetCommentDAO(MappedClass):
 
     class __mongometa__:
         session = session
@@ -113,8 +113,8 @@ class DatasetComment(MappedClass):
     author_link = FieldProperty(schema.String)
     content = FieldProperty(schema.String)
     addition_date = FieldProperty(schema.datetime)
-    dataset_id = ForeignIdProperty('Dataset')
-    dataset = RelationProperty('Dataset')
+    dataset_id = ForeignIdProperty('DatasetDAO')
+    dataset = RelationProperty('DatasetDAO')
 
     def __init__(self, author_name, author_link, content, addition_date=now(), dataset_id=None, dataset=None):
         if dataset_id is None and dataset is not None:
@@ -128,11 +128,11 @@ class DatasetComment(MappedClass):
         return cls(**init_dict)
 
     def delete(self):
-        DatasetComment.query.remove({'_id': self._id})
+        DatasetCommentDAO.query.remove({'_id': self._id})
 
 
 
-class DatasetElementComment(MappedClass):
+class DatasetElementCommentDAO(MappedClass):
 
     class __mongometa__:
         session = session
@@ -143,8 +143,8 @@ class DatasetElementComment(MappedClass):
     author_link = FieldProperty(schema.String)
     content = FieldProperty(schema.String)
     addition_date = FieldProperty(schema.datetime)
-    element_id = ForeignIdProperty('DatasetElement')
-    element = RelationProperty('DatasetElement')
+    element_id = ForeignIdProperty('DatasetElementDAO')
+    element = RelationProperty('DatasetElementDAO')
 
     def __init__(self, author_name, author_link, content, addition_date=now(), element_id=None, element=None):
         if element_id is None and element is not None:
@@ -158,7 +158,7 @@ class DatasetElementComment(MappedClass):
         return cls(**init_dict)
 
     def delete(self):
-        DatasetElementComment.query.remove({'_id': self._id})
+        DatasetElementCommentDAO.query.remove({'_id': self._id})
         MappedClass.delete(self)
 
 from ming.odm import Mapper

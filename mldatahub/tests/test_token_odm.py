@@ -6,8 +6,8 @@ __author__ = 'Iván de Paz Centeno'
 import unittest
 from mldatahub.config.config import global_config
 global_config.set_session_uri("mongodb://localhost:27017/unittests")
-from mldatahub.odm.dataset import Dataset
-from mldatahub.odm.token import Token
+from mldatahub.odm.dataset_dao import DatasetDAO
+from mldatahub.odm.token_dao import TokenDAO
 
 
 class TestTokenODM(unittest.TestCase):
@@ -20,20 +20,40 @@ class TestTokenODM(unittest.TestCase):
         Tests that tokens are successfully created and removed.
         :return:
         """
-        token = Token("example", 2, 3)
+        token = TokenDAO("example", 2, 3)
         token_gui = token.token_gui
         self.assertTrue(len(token.token_gui) > 10)
         self.session.flush()
-        token = Token.query.get(token_gui=token_gui)
+        token = TokenDAO.query.get(token_gui=token_gui)
         self.assertEqual(token.token_gui, token_gui)
         token.delete()
-        token = Token.query.get(token_gui)
+        token = TokenDAO.query.get(token_gui)
         self.assertIsNone(token)
+
+    def test_token_can_link_datasets(self):
+        """
+        Tests that tokens can be associated to multiple datasets and disassociated.
+        :return:
+        """
+        token1 = TokenDAO("example_token", 2, 5)
+        token2 = TokenDAO("example_token2", 2, 5)
+
+        dataset1 = DatasetDAO("ex/ivan", "example1", "lalala", "none")
+        dataset2 = DatasetDAO("ex/ivan2", "example2", "lalala", "none")
+
+        token1 = token1.link_datasets([dataset1, dataset2])
+        token2 = token2.link_dataset(dataset2)
+
+        self.assertEqual(len(token1.datasets), 2)
+        self.assertEqual(len(token2.datasets), 1)
+
+        token1 = token1.unlink_dataset(dataset2)
+        self.assertEqual(len(token1.datasets), 1)
 
 
     def tearDown(self):
-        Dataset.query.remove()
-        Token.query.remove()
+        DatasetDAO.query.remove()
+        TokenDAO.query.remove()
 
 if __name__ == '__main__':
     unittest.main()

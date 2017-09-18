@@ -12,7 +12,7 @@ __author__ = 'Iván de Paz Centeno'
 session = global_config.get_session()
 
 
-class Token(MappedClass):
+class TokenDAO(MappedClass):
 
     class __mongometa__:
         session = session
@@ -27,8 +27,8 @@ class Token(MappedClass):
     modification_date = FieldProperty(schema.datetime)
     end_date = FieldProperty(schema.datetime)
     privileges = FieldProperty(schema.Int)
-    _dataset= ForeignIdProperty('Dataset', uselist=True)
-    datasets = RelationProperty('Dataset')
+    _dataset= ForeignIdProperty('DatasetDAO', uselist=True)
+    datasets = RelationProperty('DatasetDAO')
 
     def __init__(self, description, max_dataset_count, max_dataset_size, token_gui=None,
                  creation_date=now(), modification_date=now(), end_date=token_future_end(),
@@ -73,5 +73,12 @@ class Token(MappedClass):
         self.datasets = old_datasets
         session.flush()
         return session.refresh(self)
+
+    def serialize(self):
+        fields = ["token_gui", "description", "max_dataset_count",
+                  "max_dataset_size", "creation_date",
+                  "modification_date", "end_date"]
+
+        return {f: str(self[f]) for f in fields}
 
 Mapper.compile_all()
