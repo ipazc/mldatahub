@@ -14,7 +14,7 @@ from mldatahub.odm.token_dao import TokenDAO
 __author__ = 'Iván de Paz Centeno'
 
 
-class TestTokenFactory(unittest.TestCase):
+class TestDatasetFactory(unittest.TestCase):
 
     def setUp(self):
         self.session = global_config.get_session()
