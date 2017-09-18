@@ -104,7 +104,7 @@ class Tokens(TokenizedResource):
         _, token = self.token_parser.parse_args(required_all_token_privileges=required_privileges)
         args = self.post_parser.parse_args()
 
-        created_token = TokenFactory(token).create_token(**args)
+        created_token = TokenFactory(token).create_token(**{k:v for k,v in args.items() if v is not None})
 
         return created_token.serialize(), 201
 
@@ -135,21 +135,18 @@ class Token(TokenizedResource):
             "description":
             {
                 "type": str,
-                "required": False,
                 "help": "Description for the dataset.",
                 "location": "json"
             },
             "max_dataset_count":
             {
                 "type": int,
-                "required": True,
                 "help": "Max number of datasets that it is allowed to create this token.",
                 "location": "json"
             },
             "max_dataset_size":
             {
                 "type": int,
-                "required": True,
                 "help": "Max size for a dataset created by this token",
                 "location": "json"
             },
@@ -162,7 +159,6 @@ class Token(TokenizedResource):
             "privileges":
             {
                 "type": int,
-                "required": True,
                 "help": "Privileges integer for this token",
                 "location": "json"
             },

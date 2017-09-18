@@ -32,6 +32,8 @@ class TokenFactory(object):
 
     def create_token(self, *args, **kwargs):
         kwargs = dict(kwargs)
+        can_create_others = bool(self.token.privileges & Privileges.ADMIN_CREATE_TOKEN)
+        can_create_all_inner_tokens = bool(self.token.privileges & Privileges.USER_CREATE_TOKEN)
 
         if "url_prefix" in kwargs:
             url_prefix = kwargs["url_prefix"]
@@ -39,17 +41,20 @@ class TokenFactory(object):
         else:
             url_prefix = args[3]
 
-        if "privileges" in kwargs and not bool(self.token.privileges & Privileges.ADMIN_CREATE_TOKEN):
-            privileges = kwargs["privileges"]
+        if not can_create_others:
+            if "privileges" in kwargs:
+                privileges = kwargs["privileges"]
 
-            # We need to check privileges creation. An exploit would be to allow creation of tokens with highest privileges
-            # from non-trusted tokens.
-            if not self._compatible_privileges(self.token.privileges, privileges):
-                abort(409)
+                # We need to check privileges creation. An exploit would be to allow creation of tokens with highest privileges
+                # from non-trusted tokens.
+                if not self._compatible_privileges(self.token.privileges, privileges):
+                    abort(409)
 
-        # Security: user can only create tokens within his url_prefix
-        if url_prefix != self.token.url_prefix and not bool(self.token.privileges & Privileges.ADMIN_CREATE_TOKEN):
-            abort(401)
+            if not can_create_all_inner_tokens:
+                abort(401)
+
+            if url_prefix != self.token.url_prefix:
+                abort(401)
 
         kwargs["url_prefix"] = url_prefix
 
@@ -121,9 +126,15 @@ class TokenFactory(object):
             if not can_edit_all_inner_tokens:
                 abort(401)
 
-        if 'url_prefix' in kwargs and not can_edit_others:
+            # Admin tokens can't be edited by normal users.
+            if any([edit_token.privileges & Privileges.ADMIN_CREATE_TOKEN,
+                    edit_token.privileges & Privileges.ADMIN_EDIT_TOKEN,
+                    edit_token.privileges & Privileges.ADMIN_DESTROY_TOKEN,]):
+                abort(401)
+
             # URL prefixes can't be changed once created unless it is done by admin.
-            abort(401)
+            if 'url_prefix' in kwargs:
+                abort(401)
 
         try:
             for token_arg, value in kwargs.items():
@@ -136,3 +147,31 @@ class TokenFactory(object):
         self.session.flush()
 
         return edit_token
+
+    def delete_token(self, token_gui):
+        # Important check: if not ADMIN_EDIT_TOKEN then it can only be token from the same user.
+        # This is a security issue: otherwise, any user can edit other's tokens data if known.
+        can_delete_others = bool(self.token.privileges & Privileges.ADMIN_DESTROY_TOKEN)
+        can_delete_all_inner_tokens = bool(self.token.privileges & Privileges.USER_DESTROY_TOKEN)
+
+        delete_token = TokenDAO.query.get(token_gui=token_gui)
+
+        if delete_token is None:
+            abort(400)
+
+        if not can_delete_others:
+            if delete_token.url_prefix != self.token.url_prefix:
+                abort(401)
+
+            if not can_delete_all_inner_tokens:
+                abort(401)
+
+            # Admin tokens can't be deleted by normal users.
+            if any([delete_token.privileges & Privileges.ADMIN_CREATE_TOKEN,
+                    delete_token.privileges & Privileges.ADMIN_EDIT_TOKEN,
+                    delete_token.privileges & Privileges.ADMIN_DESTROY_TOKEN,]):
+                abort(401)
+
+        delete_token.delete()
+        self.session.flush()
+        return True
