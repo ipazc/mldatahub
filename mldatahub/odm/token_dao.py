@@ -27,10 +27,11 @@ class TokenDAO(MappedClass):
     modification_date = FieldProperty(schema.datetime)
     end_date = FieldProperty(schema.datetime)
     privileges = FieldProperty(schema.Int)
+    url_prefix = FieldProperty(schema.String)
     _dataset= ForeignIdProperty('DatasetDAO', uselist=True)
     datasets = RelationProperty('DatasetDAO')
 
-    def __init__(self, description, max_dataset_count, max_dataset_size, token_gui=None,
+    def __init__(self, description, max_dataset_count, max_dataset_size, url_prefix, token_gui=None,
                  creation_date=now(), modification_date=now(), end_date=token_future_end(),
                  privileges=Privileges.RO_WATCH_DATASET):
 
@@ -75,7 +76,7 @@ class TokenDAO(MappedClass):
         return session.refresh(self)
 
     def serialize(self):
-        fields = ["token_gui", "description", "max_dataset_count",
+        fields = ["token_gui", "url_prefix", "description", "max_dataset_count",
                   "max_dataset_size", "creation_date",
                   "modification_date", "end_date"]
 

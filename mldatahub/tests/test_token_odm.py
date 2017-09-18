@@ -20,7 +20,7 @@ class TestTokenODM(unittest.TestCase):
         Tests that tokens are successfully created and removed.
         :return:
         """
-        token = TokenDAO("example", 2, 3)
+        token = TokenDAO("example", 2, 3, "dalap")
         token_gui = token.token_gui
         self.assertTrue(len(token.token_gui) > 10)
         self.session.flush()
@@ -35,8 +35,8 @@ class TestTokenODM(unittest.TestCase):
         Tests that tokens can be associated to multiple datasets and disassociated.
         :return:
         """
-        token1 = TokenDAO("example_token", 2, 5)
-        token2 = TokenDAO("example_token2", 2, 5)
+        token1 = TokenDAO("example_token", 2, 5, "dalap")
+        token2 = TokenDAO("example_token2", 2, 5, "dalap")
 
         dataset1 = DatasetDAO("ex/ivan", "example1", "lalala", "none")
         dataset2 = DatasetDAO("ex/ivan2", "example2", "lalala", "none")
@@ -49,7 +49,6 @@ class TestTokenODM(unittest.TestCase):
 
         token1 = token1.unlink_dataset(dataset2)
         self.assertEqual(len(token1.datasets), 1)
-
 
     def tearDown(self):
         DatasetDAO.query.remove()

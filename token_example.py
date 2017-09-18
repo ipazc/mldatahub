@@ -8,8 +8,8 @@ __author__ = 'Iván de Paz Centeno'
 
 session = global_config.get_session()
 
-token1 = TokenDAO("example_token", 2, 5)
-token2 = TokenDAO("example_token2", 2, 5)
+token1 = TokenDAO("example_token", 2, 5, "dalap")
+token2 = TokenDAO("example_token2", 2, 5, "dalap")
 dataset1 = DatasetDAO("ex/ivan", "example1", "lalala", "none")
 dataset2 = DatasetDAO("ex/ivan2", "example2", "lalala", "none")
 
