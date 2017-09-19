@@ -136,6 +136,10 @@ class TokenFactory(object):
             if 'url_prefix' in kwargs:
                 abort(401)
 
+            # Datasets links can only be changed with link_datasets() and unlink_datasets()
+            if 'datasets' in kwargs:
+                abort(400)
+
         try:
             for token_arg, value in kwargs.items():
 
@@ -147,6 +151,83 @@ class TokenFactory(object):
         self.session.flush()
 
         return edit_token
+
+    def link_datasets(self, token_gui, datasets_url_prefix):
+        # Important check: if not ADMIN_EDIT_TOKEN then it can only be token from the same user.
+        # This is a security issue: otherwise, any user can edit other's tokens data if known.
+        can_link_others = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
+        can_link_all_inner_tokens = bool(self.token.privileges & Privileges.USER_EDIT_TOKEN)
+
+        if not any([can_link_all_inner_tokens, can_link_others]):
+            abort(401)
+
+        edit_token = TokenDAO.query.get(token_gui=token_gui)
+
+        if edit_token is None:
+            abort(400)
+
+        if not can_link_others:
+
+            if edit_token.url_prefix != self.token.url_prefix:
+                abort(401)
+
+            # Admin tokens can't be modified by normal users.
+            if any([edit_token.privileges & Privileges.ADMIN_CREATE_TOKEN,
+                    edit_token.privileges & Privileges.ADMIN_EDIT_TOKEN,
+                    edit_token.privileges & Privileges.ADMIN_DESTROY_TOKEN,]):
+                abort(401)
+
+            # Datasets MUST belong to this token url prefix.
+            if not all([prefix.split("/")[0] == self.token.url_prefix for prefix in datasets_url_prefix]):
+                abort(401)
+
+        datasets = [DatasetDAO.query.get(url_prefix=url_prefix) for url_prefix in datasets_url_prefix]
+        datasets = [dataset for dataset in datasets if dataset is not None and dataset not in edit_token.datasets]
+
+        if len(datasets) > 0:
+            edit_token = edit_token.link_datasets(datasets)
+
+        self.session.flush()
+        return edit_token
+
+    def unlink_datasets(self, token_gui, datasets_url_prefix):
+        # Important check: if not ADMIN_EDIT_TOKEN then it can only be token from the same user.
+        # This is a security issue: otherwise, any user can edit other's tokens data if known.
+        can_unlink_others = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
+        can_unlink_all_inner_tokens = bool(self.token.privileges & Privileges.USER_EDIT_TOKEN)
+
+        if not any([can_unlink_all_inner_tokens, can_unlink_others]):
+            abort(401)
+
+        edit_token = TokenDAO.query.get(token_gui=token_gui)
+
+        if edit_token is None:
+            abort(400)
+
+        if not can_unlink_others:
+            if edit_token.url_prefix != self.token.url_prefix:
+                abort(401)
+
+            # Admin tokens can't be modified by normal users.
+            if any([edit_token.privileges & Privileges.ADMIN_CREATE_TOKEN,
+                    edit_token.privileges & Privileges.ADMIN_EDIT_TOKEN,
+                    edit_token.privileges & Privileges.ADMIN_DESTROY_TOKEN,]):
+                abort(401)
+
+            # Datasets MUST belong to this token url prefix.
+            if not all([prefix.split("/")[0] == self.token.url_prefix for prefix in datasets_url_prefix]):
+                abort(401)
+
+        datasets = [dataset for dataset in edit_token.datasets if dataset.url_prefix in datasets_url_prefix]
+
+        if len(datasets) > 0:
+            edit_token = edit_token.unlink_datasets(datasets)
+        else:
+            abort(400)
+
+        self.session.flush()
+        return edit_token
+
 
     def delete_token(self, token_gui):
         # Important check: if not ADMIN_EDIT_TOKEN then it can only be token from the same user.

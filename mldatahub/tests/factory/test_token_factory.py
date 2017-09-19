@@ -251,6 +251,89 @@ class TestTokenFactory(unittest.TestCase):
         # Admin token can delete anything
         TokenFactory(token4).delete_token(token_demo1.token_gui)
 
+    def test_dataset_can_be_linked_with_token(self):
+        """
+        Factory can link datasets.
+        :return:
+        """
+        token = TokenDAO("linker", 1, 1, "testinglink", privileges=Privileges.RO_WATCH_DATASET+Privileges.CREATE_DATASET)
+        token2 = TokenDAO("linker", 1, 1, "testinglink2", privileges=Privileges.RO_WATCH_DATASET+Privileges.USER_EDIT_TOKEN)
+        token21 = TokenDAO("linker", 1, 1, "testinglink2", privileges=Privileges.RO_WATCH_DATASET+Privileges.USER_EDIT_TOKEN)
+        dataset = DatasetDAO("{}/{}".format(token.url_prefix, "dataset"), "dataset1", "dataset example", "none")
+        dataset2 = DatasetDAO("{}/{}".format(token2.url_prefix, "dataset2"), "dataset2", "dataset example2", "none")
+
+        token3 = TokenDAO("linked", 1, 1, "testinglink2", privileges=Privileges.RO_WATCH_DATASET+Privileges.ADMIN_EDIT_TOKEN)
+        self.session.flush()
+        # Not privileged token can't link a dataset.
+        with self.assertRaises(Unauthorized) as ex:
+            token21 = TokenFactory(token).link_datasets(token21.token_gui, [dataset.url_prefix])
+
+        with self.assertRaises(Unauthorized) as ex:
+            token = TokenFactory(token).link_datasets(token.token_gui, [dataset.url_prefix])
+
+        # Privileged token can link a dataset.
+        token21 = TokenFactory(token2).link_datasets(token21.token_gui, [dataset2.url_prefix])
+        self.assertEqual(len(token21.datasets), 1)
+
+        # Privileged token can NOT link a dataset of other url prefix
+        with self.assertRaises(Unauthorized) as ex:
+            token21 = TokenFactory(token2).link_datasets(token21.token_gui, [dataset.url_prefix])
+
+        # Privileged token can NOT link a dataset to a token of other url prefix
+        with self.assertRaises(Unauthorized) as ex:
+            token = TokenFactory(token2).link_datasets(token.token_gui, [dataset.url_prefix])
+
+        # Admin can do all of the above cases.
+        token21 = TokenFactory(token3).link_datasets(token21.token_gui, [dataset.url_prefix])
+        token = TokenFactory(token3).link_datasets(token.token_gui, [dataset.url_prefix])
+
+        self.assertEqual(len(token21.datasets), 2)
+        self.assertEqual(len(token.datasets), 1)
+
+    def test_dataset_can_be_unlinked_with_token(self):
+        """
+        Factory can unlink datasets.
+        :return:
+        """
+        token = TokenDAO("linker", 1, 1, "testinglink", privileges=Privileges.RO_WATCH_DATASET+Privileges.CREATE_DATASET)
+        token2 = TokenDAO("linker", 1, 1, "testinglink2", privileges=Privileges.RO_WATCH_DATASET+Privileges.USER_EDIT_TOKEN)
+        token21 = TokenDAO("linker", 1, 1, "testinglink2", privileges=Privileges.RO_WATCH_DATASET+Privileges.USER_EDIT_TOKEN)
+        dataset = DatasetDAO("{}/{}".format(token.url_prefix, "dataset"), "dataset1", "dataset example", "none")
+        dataset2 = DatasetDAO("{}/{}".format(token2.url_prefix, "dataset2"), "dataset2", "dataset example2", "none")
+
+        token3 = TokenDAO("linked", 1, 1, "testinglink2", privileges=Privileges.RO_WATCH_DATASET+Privileges.ADMIN_EDIT_TOKEN)
+        self.session.flush()
+
+        token = token.link_datasets([dataset, dataset2])
+        token21 = token21.link_datasets([dataset2])
+
+        # Not privileged token can't link a dataset.
+        with self.assertRaises(Unauthorized) as ex:
+            token21 = TokenFactory(token).unlink_datasets(token21.token_gui, [dataset2.url_prefix])
+
+        with self.assertRaises(Unauthorized) as ex:
+            token = TokenFactory(token).unlink_datasets(token.token_gui, [dataset.url_prefix])
+
+        # Privileged token can unlink a dataset.
+        token21 = TokenFactory(token2).unlink_datasets(token21.token_gui, [dataset2.url_prefix])
+        self.assertEqual(len(token21.datasets), 0)
+
+        token21 = token21.link_datasets([dataset])
+
+        # Privileged token can NOT unlink a dataset of other url prefix
+        with self.assertRaises(Unauthorized) as ex:
+            token21 = TokenFactory(token2).unlink_datasets(token21.token_gui, [dataset.url_prefix])
+
+        # Privileged token can NOT unlink a dataset from a token of other url prefix
+        with self.assertRaises(Unauthorized) as ex:
+            token = TokenFactory(token2).unlink_datasets(token.token_gui, [dataset.url_prefix])
+
+        # Admin can do all of the above cases.
+        token21 = TokenFactory(token3).unlink_datasets(token21.token_gui, [dataset.url_prefix])
+        token = TokenFactory(token3).unlink_datasets(token.token_gui, [dataset.url_prefix])
+
+        self.assertEqual(len(token21.datasets), 0)
+        self.assertEqual(len(token.datasets), 1)
 
     def tearDown(self):
         DatasetDAO.query.remove()
