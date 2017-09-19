@@ -74,6 +74,49 @@ class TestDatasetFactory(unittest.TestCase):
         self.assertEqual(join_prefixes(creator.url_prefix, "admin"), dataset.url_prefix)
         self.assertEqual(dataset.description, "Dataset example admin")
 
+    def test_dataset_modification(self):
+        """
+        Factory can modify datasets
+        :return:
+        """
+        dataset = DatasetDAO("foo/hello", "notitle", "desc", "ref")
+        dataset2 = DatasetDAO("bar/hello", "notitle", "desc", "ref")
+
+        token_unprivileged = TokenDAO("unprivileged", 0, 0, "bar")
+        token_privileged = TokenDAO("privileged", 0, 0, "bar", privileges=Privileges.EDIT_DATASET)
+        token_admin = TokenDAO("admin", 0, 0, "bar", privileges=Privileges.ADMIN_EDIT_TOKEN)
+
+        self.session.flush()
+
+        # Unprivileged token cannot modify dataset
+        with self.assertRaises(Unauthorized) as ex:
+            DatasetFactory(token_unprivileged).edit_dataset(dataset.url_prefix, title="hello")
+
+        # Privileged token cannot modify dataset if not in same url prefix
+        with self.assertRaises(Unauthorized) as ex:
+            DatasetFactory(token_privileged).edit_dataset(dataset.url_prefix, title="hello")
+
+        # Privileged token can modify dataset if in same url prefix
+        dataset2 = DatasetFactory(token_privileged).edit_dataset(dataset2.url_prefix, title="hello")
+
+        self.assertEqual(dataset2.title, "hello")
+
+        # Admin token can modify any dataset
+        dataset = DatasetFactory(token_admin).edit_dataset(dataset.url_prefix, title="hello2")
+        self.assertEqual(dataset.title, "hello2")
+
+        # Privileged can partially modify url prefix
+        dataset2 = DatasetFactory(token_privileged).edit_dataset(dataset2.url_prefix, url_prefix="new_prefix")
+        self.assertEqual(dataset2.url_prefix, "bar/new_prefix")
+
+        with self.assertRaises(BadRequest) as ex:
+            dataset2 = DatasetFactory(token_privileged).edit_dataset(dataset2.url_prefix, url_prefix="bar2/new_prefix")
+
+        # Admin can modify url prefix without problems
+        dataset2 = DatasetFactory(token_admin).edit_dataset(dataset2.url_prefix, url_prefix="bar2/new_prefix")
+
+        self.assertEqual(dataset2.url_prefix, "bar2/new_prefix")
+
     def test_dataset_destruction(self):
         """
         Factory can destroy datasets

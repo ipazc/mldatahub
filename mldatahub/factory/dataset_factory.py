@@ -46,6 +46,56 @@ class DatasetFactory(object):
 
         return dataset
 
+    def edit_dataset(self, edit_url_prefix, *args, **kwargs):
+        can_edit_inner_dataset = bool(self.token.privileges & Privileges.EDIT_DATASET)
+        can_edit_others_dataset = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
+        illegal_chars = self.illegal_chars
+
+        if not any([can_edit_inner_dataset, can_edit_others_dataset]):
+            abort(401)
+
+        try:
+            url_prefix = kwargs["url_prefix"]
+
+            if can_edit_others_dataset:
+                illegal_chars = illegal_chars[1:] # "/" is allowed for admin
+
+            if any([illegal_char in url_prefix for illegal_char in illegal_chars]):
+                abort(400)
+
+            if "/" not in url_prefix:
+                url_prefix="{}/{}".format(self.token.url_prefix, url_prefix)
+
+            kwargs['url_prefix'] = url_prefix
+
+        except KeyError as ex:
+            pass
+
+        if 'elements' in kwargs:
+            abort(400)
+
+        if 'comments' in kwargs:
+            abort(400)
+
+        edit_dataset = DatasetDAO.query.get(url_prefix=edit_url_prefix)
+
+        if edit_dataset is None:
+            abort(400)
+
+        if not can_edit_others_dataset and edit_dataset.url_prefix.split("/")[0] != self.token.url_prefix:
+            abort(401)
+
+        # Modification is performed here
+        for k, v in kwargs.items():
+            if v is None:
+                continue
+
+            edit_dataset[k] = v
+
+        self.session.flush()
+
+        return edit_dataset
+
     def destroy_dataset(self, *args, **kwargs):
         can_destroy_inner_dataset = bool(self.token.privileges & Privileges.DESTROY_DATASET)
         can_destroy_others_dataset = bool(self.token.privileges & Privileges.ADMIN_DESTROY_TOKEN)
