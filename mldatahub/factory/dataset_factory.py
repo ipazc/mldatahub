@@ -44,6 +44,8 @@ class DatasetFactory(object):
         dataset = DatasetDAO(*args, **kwargs)
         self.session.flush()
 
+        #self.token = TokenFactory(self.token).link_datasets(self.token.token_gui, [dataset.url_prefix])
+
         return dataset
 
     def edit_dataset(self, edit_url_prefix, *args, **kwargs):
@@ -82,8 +84,13 @@ class DatasetFactory(object):
         if edit_dataset is None:
             abort(400)
 
-        if not can_edit_others_dataset and edit_dataset.url_prefix.split("/")[0] != self.token.url_prefix:
-            abort(401)
+        if not can_edit_others_dataset:
+            if edit_dataset.url_prefix.split("/")[0] != self.token.url_prefix:
+                abort(401)
+
+            # Fix: this token can only edit a dataset if the dataset is linked to it.
+            if edit_dataset not in self.token.datasets:
+                abort(401)
 
         # Modification is performed here
         for k, v in kwargs.items():
@@ -96,23 +103,43 @@ class DatasetFactory(object):
 
         return edit_dataset
 
-    def destroy_dataset(self, *args, **kwargs):
+    def get_dataset(self, url_prefix):
+        can_view_inner_dataset = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
+        can_view_others_dataset = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
+
+        if not any([can_view_inner_dataset, can_view_others_dataset]):
+            abort(401)
+
+        if url_prefix is None or url_prefix == "":
+            abort(400)
+
+        view_dataset = DatasetDAO.query.get(url_prefix=url_prefix)
+
+        if view_dataset is None:
+            abort(400)
+
+        if not can_view_others_dataset and view_dataset not in self.token.datasets:
+            abort(401)
+
+        return view_dataset
+
+    def destroy_dataset(self, url_prefix, *args, **kwargs):
         can_destroy_inner_dataset = bool(self.token.privileges & Privileges.DESTROY_DATASET)
         can_destroy_others_dataset = bool(self.token.privileges & Privileges.ADMIN_DESTROY_TOKEN)
 
         if not any([can_destroy_inner_dataset, can_destroy_others_dataset]):
             abort(401)
 
-        try:
-            url_prefix = kwargs["url_prefix"]
-        except KeyError as ex:
-            url_prefix = ""
+        if url_prefix == "":
             abort(400)
 
         if not can_destroy_others_dataset and url_prefix.split("/")[0] != self.token.url_prefix:
             abort(401)
 
         dataset = DatasetDAO.query.get(url_prefix=url_prefix)
+        if dataset is None:
+            abort(400)
+
         dataset.delete()
         self.session.flush()
 

@@ -97,6 +97,12 @@ class TestDatasetFactory(unittest.TestCase):
             DatasetFactory(token_privileged).edit_dataset(dataset.url_prefix, title="hello")
 
         # Privileged token can modify dataset if in same url prefix
+        # NOT: Because dataset is not linked with the token.
+        with self.assertRaises(Unauthorized) as ex:
+            dataset2 = DatasetFactory(token_privileged).edit_dataset(dataset2.url_prefix, title="hello")
+
+        # If we link it, then it does:
+        token_privileged = token_privileged.link_dataset(dataset2)
         dataset2 = DatasetFactory(token_privileged).edit_dataset(dataset2.url_prefix, title="hello")
 
         self.assertEqual(dataset2.title, "hello")
@@ -164,6 +170,50 @@ class TestDatasetFactory(unittest.TestCase):
 
         dataset = DatasetDAO.query.get(url_prefix="user2/creator")
         self.assertIsNone(dataset, None)
+
+    def test_dataset_retrieval(self):
+        """
+        Factory can retrieve datasets.
+        :return:
+        """
+        anonymous = TokenDAO("Anonymous", 1, 1, "anonymous")
+        watcher = TokenDAO("normal user", 1, 1, "user1", privileges=0)
+        creator = TokenDAO("normal user privileged", 1, 1, "user1", privileges=Privileges.CREATE_DATASET)
+        creator2 = TokenDAO("normal user privileged", 1, 1, "user2", privileges=Privileges.CREATE_DATASET)
+        admin = TokenDAO("admin user", 1, 1, "admin", privileges=Privileges.ADMIN_CREATE_TOKEN + Privileges.ADMIN_EDIT_TOKEN + Privileges.ADMIN_DESTROY_TOKEN)
+
+        dataset = DatasetFactory(creator).create_dataset(url_prefix="creator", title="Creator dataset", description="Dataset example creator", reference="Unknown")
+        dataset2 = DatasetFactory(creator2).create_dataset(url_prefix="creator", title="Creator dataset", description="Dataset example creator", reference="Unknown")
+        self.session.flush()
+
+        # anonymous should not be able to get info from the dataset
+        with self.assertRaises(Unauthorized) as ex:
+            dataset3 =DatasetFactory(anonymous).get_dataset(dataset.url_prefix)
+
+        # watcher should not be able to get info from the dataset
+        with self.assertRaises(Unauthorized) as ex:
+            dataset3 =DatasetFactory(watcher).get_dataset(dataset.url_prefix)
+
+        # creator should not be able to get info from the dataset
+        with self.assertRaises(Unauthorized) as ex:
+            dataset3 =DatasetFactory(creator).get_dataset(dataset.url_prefix)
+
+        # admin should be able to get info from the dataset
+        dataset3 =DatasetFactory(admin).get_dataset(dataset.url_prefix)
+        self.assertEqual(dataset3.url_prefix, dataset.url_prefix)
+
+        anonymous = anonymous.link_dataset(dataset)
+
+        # anonymous should now be able to get info from the dataset
+        dataset3 =DatasetFactory(anonymous).get_dataset(dataset.url_prefix)
+        self.assertEqual(dataset3.url_prefix, dataset.url_prefix)
+
+        # The privilege RO_WATCH_DATASET is always required except for admin
+
+        watcher = watcher.link_dataset(dataset)
+        with self.assertRaises(Unauthorized) as ex:
+            dataset3 =DatasetFactory(watcher).get_dataset(dataset.url_prefix)
+
 
     def tearDown(self):
         DatasetDAO.query.remove()

@@ -7,8 +7,6 @@ from mldatahub.api.tokenized_resource import TokenizedResource
 from mldatahub.config.config import now, global_config
 from mldatahub.config.privileges import Privileges
 from mldatahub.factory.token_factory import TokenFactory
-from mldatahub.odm.dataset_dao import DatasetDAO
-from mldatahub.odm.token_dao import TokenDAO
 
 __author__ = "Iván de Paz Centeno"
 
@@ -90,7 +88,7 @@ class Tokens(TokenizedResource):
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
 
         args = self.get_parser.parse_args()
-        print(args)
+
         tokens = TokenFactory(token).get_tokens(**args)
 
         return [t.serialize() for t in tokens], 201
@@ -208,3 +206,19 @@ class Token(TokenizedResource):
         edited_token = TokenFactory(token).edit_token(token_id, **args)
 
         return edited_token.serialize(), 201
+
+    def delete(self, token_id):
+        required_any_privileges = [
+            Privileges.ADMIN_DESTROY_TOKEN,
+            Privileges.USER_DESTROY_TOKEN
+        ]
+
+        _, token = self.token_parser.parse_args(required_any_token_privileges=required_any_privileges)
+        args = self.get_parser.parse_args()
+
+        if token_id != token.token_gui:
+            abort(401)
+
+        TokenFactory(token).delete_token(token_id)
+
+        return "Done.", 201
