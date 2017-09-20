@@ -20,13 +20,6 @@ class Tokens(TokenizedResource):
         self.post_parser = reqparse.RequestParser()
         self.session = global_config.get_session()
         arguments = {
-            "dataset_url_prefixes":
-                {
-                    "type": list,
-                    "required": True,
-                    "help": "URL prefixes for the linked datasets to this token.",
-                    "location": "json"
-                },
             "description":
                 {
                     "type": str,
@@ -59,12 +52,6 @@ class Tokens(TokenizedResource):
                     "type": int,
                     "required": True,
                     "help": "Privileges integer for this token",
-                    "location": "json"
-                },
-            "token_gui":
-                {
-                    "type": str,
-                    "help": "Token GUI, if not specified a new one is generated.",
                     "location": "json"
                 },
             "url_prefix":
@@ -133,7 +120,7 @@ class Token(TokenizedResource):
             "description":
             {
                 "type": str,
-                "help": "Description for the dataset.",
+                "help": "Description for the token.",
                 "location": "json"
             },
             "max_dataset_count":
@@ -191,7 +178,7 @@ class Token(TokenizedResource):
 
         return view_token.serialize(), 201
 
-    def post(self, token_id):
+    def patch(self, token_id):
         required_any_privileges = [
             Privileges.ADMIN_EDIT_TOKEN,
             Privileges.USER_EDIT_TOKEN
@@ -221,4 +208,32 @@ class Token(TokenizedResource):
 
         TokenFactory(token).delete_token(token_id)
 
-        return "Done.", 201
+        return "Done", 201
+
+class TokenLinker(TokenizedResource):
+
+    def put(self, token_id, token_prefix, dataset_prefix):
+        required_any_privileges = [
+            Privileges.ADMIN_EDIT_TOKEN,
+            Privileges.USER_EDIT_TOKEN
+        ]
+
+        _, token = self.token_parser.parse_args(required_any_token_privileges=required_any_privileges)
+        url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
+
+        token = TokenFactory(token).link_datasets(token_id, [url_prefix])
+
+        return "Done", 200
+
+    def delete(self, token_id, token_prefix, dataset_prefix):
+        required_any_privileges = [
+            Privileges.ADMIN_EDIT_TOKEN,
+            Privileges.USER_EDIT_TOKEN
+        ]
+
+        _, token = self.token_parser.parse_args(required_any_token_privileges=required_any_privileges)
+        url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
+
+        token = TokenFactory(token).unlink_datasets(token_id, [url_prefix])
+
+        return "Done", 200

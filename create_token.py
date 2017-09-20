@@ -11,10 +11,10 @@ __author__ = "Iván de Paz Centeno"
 #             + Privileges.ADMIN_EDIT_TOKEN\
 #             + Privileges.ADMIN_DESTROY_TOKEN
 
-privileges = Privileges.USER_CREATE_TOKEN + Privileges.USER_EDIT_TOKEN + Privileges.USER_DESTROY_TOKEN
+privileges = Privileges.USER_CREATE_TOKEN + Privileges.USER_EDIT_TOKEN + Privileges.USER_DESTROY_TOKEN + Privileges.RO_WATCH_DATASET
 
 
-token1 = TokenDAO("Admin1", 0, 0, "ipazc2", privileges=privileges)
+token1 = TokenDAO("Ivan de Paz Centeno", 100, 10000, "ipazc", privileges=privileges)
 
 global_config.get_session().flush()
 print(token1.token_gui)

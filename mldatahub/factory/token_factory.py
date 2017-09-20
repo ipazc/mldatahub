@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from flask_restful import abort
-from mldatahub.config.config import global_config
+from mldatahub.config.config import global_config, now
 from mldatahub.config.privileges import Privileges
 from mldatahub.odm.dataset_dao import DatasetDAO
 from mldatahub.odm.token_dao import TokenDAO
@@ -139,6 +139,8 @@ class TokenFactory(object):
             # Datasets links can only be changed with link_datasets() and unlink_datasets()
             if 'datasets' in kwargs:
                 abort(400)
+
+        kwargs['modification_date'] = now()
 
         try:
             for token_arg, value in kwargs.items():

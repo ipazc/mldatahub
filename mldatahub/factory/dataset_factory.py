@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from flask_restful import abort
-from mldatahub.config.config import global_config
+from mldatahub.config.config import global_config, now
 from mldatahub.config.privileges import Privileges
 from mldatahub.odm.dataset_dao import DatasetDAO
 
@@ -10,10 +10,11 @@ __author__ = 'Iván de Paz Centeno'
 
 class DatasetFactory(object):
 
+    illegal_chars = "/*;:,.ç´`+Ç¨^><¿?'¡¿!\"·$%&()@~¬"
+
     def __init__(self, token):
         self.token = token
         self.session = global_config.get_session()
-        self.illegal_chars = "/*;:,.ç´`+Ç¨^><¿?'¡¿!\"·$%&()@~¬"
 
     def create_dataset(self, *args, **kwargs):
         can_create_inner_dataset = bool(self.token.privileges & Privileges.CREATE_DATASET)
@@ -21,6 +22,9 @@ class DatasetFactory(object):
         illegal_chars = self.illegal_chars
 
         if not any([can_create_inner_dataset, can_create_others_dataset]):
+            abort(401)
+
+        if not can_create_others_dataset and self._dataset_limit_reached():
             abort(401)
 
         try:
@@ -47,6 +51,9 @@ class DatasetFactory(object):
         #self.token = TokenFactory(self.token).link_datasets(self.token.token_gui, [dataset.url_prefix])
 
         return dataset
+
+    def _dataset_limit_reached(self):
+        return len(self.token.datasets) >= self.token.max_dataset_count
 
     def edit_dataset(self, edit_url_prefix, *args, **kwargs):
         can_edit_inner_dataset = bool(self.token.privileges & Privileges.EDIT_DATASET)
@@ -92,6 +99,8 @@ class DatasetFactory(object):
             if edit_dataset not in self.token.datasets:
                 abort(401)
 
+        kwargs['modification_date'] = now()
+
         # Modification is performed here
         for k, v in kwargs.items():
             if v is None:
@@ -123,7 +132,7 @@ class DatasetFactory(object):
 
         return view_dataset
 
-    def destroy_dataset(self, url_prefix, *args, **kwargs):
+    def destroy_dataset(self, url_prefix):
         can_destroy_inner_dataset = bool(self.token.privileges & Privileges.DESTROY_DATASET)
         can_destroy_others_dataset = bool(self.token.privileges & Privileges.ADMIN_DESTROY_TOKEN)
 
