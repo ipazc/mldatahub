@@ -31,7 +31,7 @@ class LocalStorage(GenericStorage):
 
     def _generate_token(self):
         id = str(uuid.uuid4().hex)
-        while os.path.exists(id):
+        while os.path.exists(os.path.join(self.root_key, id)):
             id = str(uuid.uuid4().hex)
 
         return id
