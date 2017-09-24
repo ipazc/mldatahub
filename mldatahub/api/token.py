@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from flask_restful import reqparse, abort
-from mldatahub.api.tokenized_resource import TokenizedResource
+from mldatahub.api.tokenized_resource import TokenizedResource, control_access
 
 from mldatahub.config.config import now, global_config
 from mldatahub.config.privileges import Privileges
@@ -66,6 +66,7 @@ class Tokens(TokenizedResource):
         for argument, kwargs in arguments.items():
             self.post_parser.add_argument(argument, **kwargs)
 
+    @control_access()
     def get(self):
         required_privileges = [
             Privileges.ADMIN_EDIT_TOKEN,
@@ -80,6 +81,7 @@ class Tokens(TokenizedResource):
 
         return [t.serialize() for t in tokens], 201
 
+    @control_access()
     def post(self):
         required_privileges = [
             Privileges.ADMIN_CREATE_TOKEN,
@@ -164,6 +166,7 @@ class Token(TokenizedResource):
         for argument, kwargs in arguments.items():
             self.post_parser.add_argument(argument, **kwargs)
 
+    @control_access()
     def get(self, token_id):
 
         required_any_privileges = [
@@ -178,6 +181,7 @@ class Token(TokenizedResource):
 
         return view_token.serialize(), 201
 
+    @control_access()
     def patch(self, token_id):
         required_any_privileges = [
             Privileges.ADMIN_EDIT_TOKEN,
@@ -194,6 +198,7 @@ class Token(TokenizedResource):
 
         return edited_token.serialize(), 201
 
+    @control_access()
     def delete(self, token_id):
         required_any_privileges = [
             Privileges.ADMIN_DESTROY_TOKEN,
@@ -212,6 +217,7 @@ class Token(TokenizedResource):
 
 class TokenLinker(TokenizedResource):
 
+    @control_access()
     def put(self, token_id, token_prefix, dataset_prefix):
         required_any_privileges = [
             Privileges.ADMIN_EDIT_TOKEN,
@@ -225,6 +231,7 @@ class TokenLinker(TokenizedResource):
 
         return "Done", 200
 
+    @control_access()
     def delete(self, token_id, token_prefix, dataset_prefix):
         required_any_privileges = [
             Privileges.ADMIN_EDIT_TOKEN,

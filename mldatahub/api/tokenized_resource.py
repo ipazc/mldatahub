@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from flask import request
 from flask_restful import reqparse, abort, Resource
-from mldatahub.config.config import now
+from mldatahub.config.config import now, global_config
 from mldatahub.odm.dataset_dao import DatasetDAO
+from mldatahub.odm.restapi_dao import RestAPIDAO
 from mldatahub.odm.token_dao import TokenDAO
 
 __author__ = 'Iván de Paz Centeno'
@@ -53,3 +55,33 @@ class TokenizedResource(Resource):
         super().__init__()
         self.token_parser = TokenizedRequestParser()
         self.token_parser.add_token_request()
+
+
+MAX_ACCESS_TIMES = global_config.get_max_access_times()
+ACCESS_RESET_TIME = global_config.get_access_reset_time()
+session = global_config.get_session()
+
+def control_access():
+    def func_wrap(func):
+        def args_wrap(*args, **kwargs):
+            remote_ip = request.remote_addr
+
+            ip_control = RestAPIDAO.query.get(ip=remote_ip)
+
+            if ip_control is None:
+                ip_control = RestAPIDAO(ip=remote_ip, last_access=now(), num_accesses=0)
+
+            if (now() - ip_control.last_access).total_seconds() > ACCESS_RESET_TIME:
+                ip_control.last_access = now()
+                ip_control.num_accesses = 0
+
+            if ip_control.num_accesses > MAX_ACCESS_TIMES:
+                abort(429)
+
+            ip_control.num_accesses += 1
+
+            session.flush()
+            print("Controlled access to {}".format(remote_ip))
+            return func(*args, **kwargs)
+        return args_wrap
+    return func_wrap

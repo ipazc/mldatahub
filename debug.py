@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from mldatahub.config.config import global_config
-from mldatahub.odm.dataset_dao import DatasetDAO
+
 
 __author__ = 'Iván de Paz Centeno'
 
-#dataset1 = DatasetDAO("lala", "a", "b", "c")
-#dataset2 = DatasetDAO("lala2", "a", "b", "c")
-#dataset3 = DatasetDAO("lala3", "a", "b", "c")
-#dataset4 = DatasetDAO("lala4", "a", "b", "c")
 
-session = global_config.get_session()
+from requests import get
 
-#session.flush()
+"""data ={
+    'privileges': '2',
+    'description': 'lalele',
+    "max_dataset_count": 10000,
+    "max_dataset_size": 100000,
+    'dataset_url_prefixes': [
+        "ex/ivan2",
+        "ex/ivan"
+    ]
+}
+"""
 
-for d in DatasetDAO.query.find({"title": "a"}).skip(4).limit(2):
-    print(d.url_prefix)
-
+for x in range(100):
+    print(get('http://192.168.0.13:5000/tokens').json())

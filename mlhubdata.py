@@ -19,7 +19,7 @@ if __name__ == '__main__':
     api.add_resource(TokenLinker, '/tokens/<token_id>/link/<token_prefix>/<dataset_prefix>')
     api.add_resource(Datasets, '/datasets')
     api.add_resource(Dataset, '/datasets/<token_prefix>/<dataset_prefix>')
-    api.add_resource(DatasetElements, '/datasets/<token_prefix>/<dataset_prefix>/elements')
+    #api.add_resource(DatasetElements, '/datasets/<token_prefix>/<dataset_prefix>/elements')
 
-    app.run(debug=True, threaded=True)
+    app.run(host="localhost", debug=True, threaded=True)
 

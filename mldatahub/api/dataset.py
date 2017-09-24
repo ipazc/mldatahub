@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from flask_restful import reqparse
-from mldatahub.api.tokenized_resource import TokenizedResource
+from mldatahub.api.tokenized_resource import TokenizedResource, control_access
 from mldatahub.config.config import global_config, now
 from mldatahub.config.privileges import Privileges
 from mldatahub.factory.dataset_factory import DatasetFactory
@@ -60,6 +60,7 @@ class Datasets(TokenizedResource):
         for argument, kwargs in arguments.items():
             self.post_parser.add_argument(argument, **kwargs)
 
+    @control_access()
     def get(self):
         """
         Retrieves all the datasets associated to the current token.
@@ -74,6 +75,7 @@ class Datasets(TokenizedResource):
 
         return [dataset.serialize() for dataset in token.datasets]
 
+    @control_access()
     def post(self):
         """
         Creates a dataset and links it to the token
@@ -146,6 +148,7 @@ class Dataset(TokenizedResource):
         for argument, kwargs in arguments.items():
             self.post_parser.add_argument(argument, **kwargs)
 
+    @control_access()
     def get(self, token_url_prefix, dataset_url_prefix):
         required_privileges = [
             Privileges.RO_WATCH_DATASET,
@@ -159,6 +162,7 @@ class Dataset(TokenizedResource):
 
         return dataset.serialize(), 200
 
+    @control_access()
     def patch(self, token_url_prefix, dataset_url_prefix):
         required_privileges = [
             Privileges.EDIT_DATASET,
@@ -174,6 +178,7 @@ class Dataset(TokenizedResource):
 
         return "Done", 200
 
+    @control_access()
     def delete(self, token_url_prefix, dataset_url_prefix):
         required_privileges = [
             Privileges.DESTROY_DATASET,

@@ -44,9 +44,21 @@ class GlobalConfig(object):
         return self.session
 
     def get_local_storage(self):
+        if 'local_storage_uri' not in self.config_values:
+            self.config_values['local_storage_uri'] = 'storage'
+
         if self.local_storage is None:
             self.local_storage = LocalStorage(self.config_values['local_storage_uri'])
         return self.local_storage
 
+    def get_max_access_times(self):
+        if 'max_access_times' not in self.config_values:
+            self.config_values['max_access_times'] = 50
+        return self.config_values['max_access_times']
+
+    def get_access_reset_time(self):
+        if 'access_reset_time' not in self.config_values:
+            self.config_values['access_reset_time'] = 1 # seconds
+        return self.config_values['access_reset_time']
 
 global_config = GlobalConfig()
