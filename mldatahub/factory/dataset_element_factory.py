@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from io import BytesIO
+
+from flask import make_response, send_file
 from flask_restful import abort
 from mldatahub.config.config import global_config, now
 from mldatahub.config.privileges import Privileges
@@ -113,7 +116,7 @@ class DatasetElementFactory(object):
         return dataset_element
 
     def get_element_thumbnail(self, element_id):
-
+        # The get_element_info() method is going to make all the required checks for the retrieval of the thumbnail.
         dataset_element = self.get_element_info(element_id)
 
         # TODO: build thumbnail from dataset_element
@@ -126,7 +129,35 @@ class DatasetElementFactory(object):
         return thumbnail
 
     def get_element_content(self, element_id):
+        # The get_element_info() method is going to make all the required checks for the retrieval of the thumbnail.
+        dataset_element = self.get_element_info(element_id)
 
+        if dataset_element.file_ref_id is None:
+            abort(404)
+
+        content = self.local_storage.get_file_content(dataset_element.file_ref_id)
+
+        with BytesIO(content) as fp:
+            result = send_file(fp)
+
+        return result
 
     def destroy_element(self, element_id):
+        can_destroy_inner_element = bool(self.token.privileges & Privileges.DESTROY_ELEMENTS)
+        can_destroy_others_elements = bool(self.token.privileges & Privileges.DESTROY_ELEMENTS)
 
+        if not any([can_destroy_inner_element, can_destroy_others_elements]):
+            abort(401)
+
+        # Destroy only removes the reference to the file, but not the file itself.
+        # Files are automatically removed by a cron timer that checks for freed files.
+
+        dataset_element = DatasetElementDAO.query.get(_id=element_id)
+
+        if dataset_element is None:
+            abort(401)
+
+        dataset_element.delete()
+
+        self.session.flush()
+        return "Done"

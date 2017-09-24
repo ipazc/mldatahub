@@ -125,7 +125,7 @@ class DatasetElementDAO(MappedClass):
         response['tags'] = self.tags # If this works, append as a field instead.
         response['comments_count'] = len(self.comments)
 
-        return
+        return response
 
 
 class DatasetCommentDAO(MappedClass):

@@ -29,7 +29,7 @@ class TestLocalStorage(unittest.TestCase):
         file_id = storage.put_file_content(b"content")
 
         self.assertTrue(os.path.exists(os.path.join(self.temp_path, str(file_id))))
-        self.assertEqual(file_id, 0)
+        self.assertGreater(len(file_id), 0)
 
         content = storage.get_file_content(file_id)
 
