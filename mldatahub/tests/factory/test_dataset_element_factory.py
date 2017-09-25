@@ -259,7 +259,6 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         self.session.flush()
 
-
     def test_dataset_element_view(self):
         """
         Factory can view elements from datasets.
