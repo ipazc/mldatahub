@@ -67,6 +67,9 @@ class DatasetDAO(MappedClass):
             if url_prefix in taken_url_prefixes:
                 del taken_url_prefixes[url_prefix]
 
+    def update(self):
+        return DatasetDAO.query.get(_id=self._id)
+
     def serialize(self):
 
         fields = ["title", "description", "reference",
@@ -78,6 +81,9 @@ class DatasetDAO(MappedClass):
         response['comments_count'] = len(self.comments)
         response['elements_count'] = len(self.elements)
 
+    def has_element(self, element):
+        return element._id in [element._id for element in self.elements]
+
 
 class DatasetElementDAO(MappedClass):
 
@@ -88,7 +94,7 @@ class DatasetElementDAO(MappedClass):
     _id = FieldProperty(schema.ObjectId)
     title = FieldProperty(schema.String)
     description = FieldProperty(schema.String)
-    file_ref_id = FieldProperty(schema.Int)
+    file_ref_id = FieldProperty(schema.String)
     http_ref = FieldProperty(schema.String)
     tags = FieldProperty(schema.Array(schema.String))
     addition_date = FieldProperty(schema.datetime)
@@ -115,6 +121,10 @@ class DatasetElementDAO(MappedClass):
         DatasetElementCommentDAO.query.remove({'element_id': self._id})
         DatasetElementDAO.query.remove({'_id': self._id})
         super().delete()
+
+    def update(self):
+        session.refresh(self)
+        return DatasetElementDAO.query.get(_id=self._id)
 
     def serialize(self):
         fields = ["title", "description", "_id",
@@ -153,6 +163,9 @@ class DatasetCommentDAO(MappedClass):
     def from_dict(cls, init_dict):
         return cls(**init_dict)
 
+    def update(self):
+        return DatasetCommentDAO.query.get(_id=self._id)
+
     def delete(self):
         DatasetCommentDAO.query.remove({'_id': self._id})
 
@@ -182,6 +195,9 @@ class DatasetElementCommentDAO(MappedClass):
     @classmethod
     def from_dict(cls, init_dict):
         return cls(**init_dict)
+
+    def update(self):
+        return DatasetElementCommentDAO.query.get(_id=self._id)
 
     def delete(self):
         DatasetElementCommentDAO.query.remove({'_id': self._id})

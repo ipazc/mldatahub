@@ -89,8 +89,8 @@ class TestDatasetODM(unittest.TestCase):
         """
         dataset = DatasetDAO("ip/asd3", "example3", "for content", "unknown")
 
-        dataset.add_element("ele1", "description of the element.", 0, tags=["tag1", "tag2"])
-        dataset.add_element("ele2", "description of the element.", 1, tags=["tag1"])
+        dataset.add_element("ele1", "description of the element.", "randomID", tags=["tag1", "tag2"])
+        dataset.add_element("ele2", "description of the element.", "randomID2", tags=["tag1"])
         self.session.flush()
         self.assertEqual(len(dataset.elements), 2)
 
@@ -117,8 +117,8 @@ class TestDatasetODM(unittest.TestCase):
         """
         dataset = DatasetDAO("ip/asd4", "example4", "desc", "none")
 
-        element = dataset.add_element("ele1", "description of the element.", 0, tags=["tag1", "tag2"])
-        element2 = dataset.add_element("ele2", "description of the element2.", 1, tags=["tag1", "tag2"])
+        element = dataset.add_element("ele1", "description of the element.", "randomID", tags=["tag1", "tag2"])
+        element2 = dataset.add_element("ele2", "description of the element2.", "randomID2", tags=["tag1", "tag2"])
 
         element.add_comment("ivan", "1", "11")
         element.add_comment("ivan", "1", "21")

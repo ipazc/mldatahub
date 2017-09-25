@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from mldatahub.config.config import global_config
+global_config.set_session_uri("mongodb://localhost:27017/unittests")
 from werkzeug.exceptions import Unauthorized, BadRequest
 from mldatahub.config.privileges import Privileges
 import unittest
-from mldatahub.config.config import global_config
 from mldatahub.factory.dataset_factory import DatasetFactory
-
-global_config.set_session_uri("mongodb://localhost:27017/unittests")
 from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO, \
     taken_url_prefixes
 from mldatahub.odm.token_dao import TokenDAO

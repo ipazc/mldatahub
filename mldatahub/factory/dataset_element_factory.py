@@ -42,13 +42,13 @@ class DatasetElementFactory(object):
             abort(401)
 
         try:
-            element_content = kwargs["element_content"]
-            del kwargs["element_content"]
+            element_content = kwargs["content"]
+            del kwargs["content"]
         except KeyError as ex:
             element_content = None
 
         if element_content is None:
-            if 'http_ref' not in kwargs:
+            if 'http_ref' not in kwargs and 'file_ref_id' not in kwargs:
                 abort(400)
 
             if 'file_ref_id' in kwargs and not can_create_others_elements:
@@ -69,7 +69,6 @@ class DatasetElementFactory(object):
 
         return dataset_element
 
-
     def edit_element(self, element_id, **kwargs):
         can_edit_inner_element = bool(self.token.privileges & Privileges.EDIT_ELEMENTS)
         can_edit_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
@@ -80,9 +79,9 @@ class DatasetElementFactory(object):
         if 'file_ref_id' in kwargs and not can_edit_others_elements:
             abort(401)
 
-        if 'element_content' in kwargs:
+        if 'content' in kwargs:
             # New content to append here...
-            file_id = self.local_storage.put_file_content(kwargs['element_content'])
+            file_id = self.local_storage.put_file_content(kwargs['content'])
             kwargs['file_ref_id'] = file_id
 
         if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_edit_others_elements:
@@ -91,6 +90,9 @@ class DatasetElementFactory(object):
         dataset_element = DatasetElementDAO.query.get(_id=element_id)
 
         if dataset_element is None:
+            abort(401)
+
+        if not self.dataset.has_element(dataset_element) and not can_edit_others_elements:
             abort(401)
 
         for k, v in kwargs.items():
@@ -144,7 +146,7 @@ class DatasetElementFactory(object):
 
     def destroy_element(self, element_id):
         can_destroy_inner_element = bool(self.token.privileges & Privileges.DESTROY_ELEMENTS)
-        can_destroy_others_elements = bool(self.token.privileges & Privileges.DESTROY_ELEMENTS)
+        can_destroy_others_elements = bool(self.token.privileges & Privileges.ADMIN_DESTROY_TOKEN)
 
         if not any([can_destroy_inner_element, can_destroy_others_elements]):
             abort(401)
@@ -157,7 +159,12 @@ class DatasetElementFactory(object):
         if dataset_element is None:
             abort(401)
 
+        if not self.dataset.has_element(dataset_element) and not can_destroy_others_elements:
+            abort(401)
+
         dataset_element.delete()
 
         self.session.flush()
-        return "Done"
+        self.dataset = self.session.refresh(self.dataset)
+
+        return self.dataset
