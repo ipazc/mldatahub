@@ -115,6 +115,9 @@ class DatasetElementFactory(object):
         if dataset_element is None:
             abort(401)
 
+        if not self.dataset.has_element(dataset_element):
+            abort(401)
+
         return dataset_element
 
     def get_element_thumbnail(self, element_id):

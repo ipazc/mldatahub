@@ -216,7 +216,9 @@ class Token(TokenizedResource):
         return "Done", 201
 
 class TokenLinker(TokenizedResource):
-
+    """
+    API to link/unlink a token to a dataset
+    """
     @control_access()
     def put(self, token_id, token_prefix, dataset_prefix):
         required_any_privileges = [

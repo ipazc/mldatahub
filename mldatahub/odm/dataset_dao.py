@@ -82,7 +82,8 @@ class DatasetDAO(MappedClass):
         response['elements_count'] = len(self.elements)
 
     def has_element(self, element):
-        return element._id in [element._id for element in self.elements]
+        return DatasetElementDAO.query.get(_id=element._id, dataset_id=self._id) is not None
+        #return element._id in [element._id for element in self.elements]
 
 
 class DatasetElementDAO(MappedClass):

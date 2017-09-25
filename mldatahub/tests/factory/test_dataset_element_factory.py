@@ -260,6 +260,78 @@ class TestDatasetElementFactory(unittest.TestCase):
         self.session.flush()
 
 
+    def test_dataset_element_view(self):
+        """
+        Factory can view elements from datasets.
+        """
+        editor = TokenDAO("normal user privileged with link", 1, 1, "user1",
+                          privileges=Privileges.RO_WATCH_DATASET
+                          )
+        editor2 = TokenDAO("normal user unprivileged", 1, 1, "user1",
+                           privileges=0
+                           )
+        admin = TokenDAO("admin user", 1, 1, "admin",
+                         privileges=Privileges.ADMIN_CREATE_TOKEN + Privileges.ADMIN_EDIT_TOKEN + Privileges.ADMIN_DESTROY_TOKEN)
+
+        dataset = DatasetDAO("user1/dataset1", "example_dataset", "dataset for testing purposes", "none",
+                             tags=["example", "0"])
+        dataset2 = DatasetDAO("user1/dataset2", "example_dataset2", "dataset2 for testing purposes", "none",
+                              tags=["example", "1"])
+
+        self.session.flush()
+
+        editor = editor.link_dataset(dataset)
+        editor2 = editor2.link_dataset(dataset2)
+
+        file_id1 = local_storage.put_file_content(b"content1")
+        file_id2 = local_storage.put_file_content(b"content2")
+
+        element = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
+        element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
+        element3 = DatasetElementDAO("example3", "none", file_id2, dataset=dataset2)
+
+        self.session.flush()
+        dataset = dataset.update()
+        dataset2 = dataset2.update()
+
+        self.assertEqual(len(dataset.elements), 2)
+        self.assertEqual(len(dataset2.elements), 1)
+
+        # editor can see elements from his dataset
+        element_watched = DatasetElementFactory(editor, dataset).get_element_info(element._id)
+        self.assertEqual(element_watched.title, "example1")
+
+        # editor can not see elements from other's datasets
+        with self.assertRaises(Unauthorized) as ex:
+            element_watched = DatasetElementFactory(editor, dataset2).get_element_info(element3._id)
+
+        # editor can not see external elements within his dataset
+        with self.assertRaises(Unauthorized) as ex:
+            element_watched = DatasetElementFactory(editor, dataset).get_element_info(element3._id)
+
+        # editor2 is not privileged and can not see any elements of his own dataset
+        with self.assertRaises(Unauthorized) as ex:
+            element_watched = DatasetElementFactory(editor2, dataset2).get_element_info(element3._id)
+
+        # Or external elements
+        with self.assertRaises(Unauthorized) as ex:
+            element_watched = DatasetElementFactory(editor2, dataset2).get_element_info(element2._id)
+
+        # Or other datasets
+        with self.assertRaises(Unauthorized) as ex:
+            element_watched = DatasetElementFactory(editor2, dataset).get_element_info(element2._id)
+
+        # Admin can do anything
+        element_watched = DatasetElementFactory(admin, dataset).get_element_info(element._id)
+        self.assertEqual(element_watched.title, "example1")
+
+        # But not this: dataset2 does not have element
+        with self.assertRaises(Unauthorized) as ex:
+            element_watched = DatasetElementFactory(admin, dataset2).get_element_info(element._id)
+
+        element_watched = DatasetElementFactory(admin, dataset2).get_element_info(element3._id)
+        self.assertEqual(element_watched.title, "example3")
+
     def tearDown(self):
         DatasetDAO.query.remove()
         DatasetCommentDAO.query.remove()
