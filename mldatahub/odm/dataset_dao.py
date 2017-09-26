@@ -73,13 +73,15 @@ class DatasetDAO(MappedClass):
     def serialize(self):
 
         fields = ["title", "description", "reference",
-                  "addition_date", "modification_date"]
+                  "creation_date", "modification_date",
+                  "url_prefix"]
 
         response = {f: str(self[f]) for f in fields}
         #response['tags'] = [str(tag) for tag in self.tags]
         response['tags'] = self.tags # If this works, append as a field instead.
         response['comments_count'] = len(self.comments)
         response['elements_count'] = len(self.elements)
+        return response
 
     def has_element(self, element):
         return DatasetElementDAO.query.get(_id=element._id, dataset_id=self._id) is not None

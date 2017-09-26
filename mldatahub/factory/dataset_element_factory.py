@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from io import BytesIO
 
-from flask import make_response, send_file
 from flask_restful import abort
-from mldatahub.config.config import global_config, now
+from mldatahub.config.config import global_config
 from mldatahub.config.privileges import Privileges
 from mldatahub.odm.dataset_dao import DatasetDAO
 from mldatahub.odm.dataset_dao import DatasetElementDAO
-from mldatahub.storage.local.local_storage import LocalStorage
 
 __author__ = 'Iván de Paz Centeno'
 
@@ -120,6 +117,15 @@ class DatasetElementFactory(object):
 
         return dataset_element
 
+    def get_elements_info(self, page=0):
+        can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
+        can_view_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
+
+        if not any([can_view_inner_element, can_view_others_elements]):
+            abort(401)
+
+        return DatasetElementDAO.query.find(dataset_id=self.dataset._id).skip(page).offset(global_config.get_page_size())
+
     def get_element_thumbnail(self, element_id):
         # The get_element_info() method is going to make all the required checks for the retrieval of the thumbnail.
         dataset_element = self.get_element_info(element_id)
@@ -142,10 +148,7 @@ class DatasetElementFactory(object):
 
         content = self.local_storage.get_file_content(dataset_element.file_ref_id)
 
-        with BytesIO(content) as fp:
-            result = send_file(fp)
-
-        return result
+        return content
 
     def destroy_element(self, element_id):
         can_destroy_inner_element = bool(self.token.privileges & Privileges.DESTROY_ELEMENTS)

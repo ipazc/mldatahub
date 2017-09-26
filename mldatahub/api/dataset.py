@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from flask import request
 from flask_restful import reqparse
 from mldatahub.api.tokenized_resource import TokenizedResource, control_access
 from mldatahub.config.config import global_config, now
@@ -89,14 +90,15 @@ class Datasets(TokenizedResource):
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
         kwargs = self.post_parser.parse_args()
+        kwargs['tags'] = request.json['tags'] # fast fix for split-bug of the tags.
 
         dataset = DatasetFactory(token).create_dataset(**kwargs)
 
-        token = TokenFactory(token).link_datasets(token.token_gui, [dataset])
-
         self.session.flush()
 
-        return "Done", 201
+        token = TokenFactory(token).link_datasets(token.token_gui, [dataset])
+
+        return dataset.serialize(), 201
 
 class Dataset(TokenizedResource):
 
@@ -149,28 +151,28 @@ class Dataset(TokenizedResource):
             self.post_parser.add_argument(argument, **kwargs)
 
     @control_access()
-    def get(self, token_url_prefix, dataset_url_prefix):
+    def get(self, token_prefix, dataset_prefix):
         required_privileges = [
             Privileges.RO_WATCH_DATASET,
             Privileges.ADMIN_EDIT_TOKEN
         ]
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
-        full_dataset_url_prefix = "{}/{}".format(token_url_prefix, dataset_url_prefix)
+        full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
         return dataset.serialize(), 200
 
     @control_access()
-    def patch(self, token_url_prefix, dataset_url_prefix):
+    def patch(self, token_prefix, dataset_prefix):
         required_privileges = [
             Privileges.EDIT_DATASET,
             Privileges.ADMIN_EDIT_TOKEN
         ]
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
-        full_dataset_url_prefix = "{}/{}".format(token_url_prefix, dataset_url_prefix)
+        full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         kwargs = self.post_parser.parse_args()
 
@@ -179,14 +181,14 @@ class Dataset(TokenizedResource):
         return "Done", 200
 
     @control_access()
-    def delete(self, token_url_prefix, dataset_url_prefix):
+    def delete(self, token_prefix, dataset_prefix):
         required_privileges = [
             Privileges.DESTROY_DATASET,
             Privileges.ADMIN_DESTROY_TOKEN
         ]
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
-        full_dataset_url_prefix = "{}/{}".format(token_url_prefix, dataset_url_prefix)
+        full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         DatasetFactory(token).destroy_dataset(full_dataset_url_prefix)
 

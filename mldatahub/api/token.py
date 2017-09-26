@@ -173,9 +173,7 @@ class Token(TokenizedResource):
             Privileges.ADMIN_EDIT_TOKEN,
             Privileges.RO_WATCH_DATASET
         ]
-
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_any_privileges)
-        args = self.get_parser.parse_args()
 
         view_token = TokenFactory(token).get_token(token_id)
 
@@ -214,6 +212,7 @@ class Token(TokenizedResource):
         TokenFactory(token).delete_token(token_id)
 
         return "Done", 201
+
 
 class TokenLinker(TokenizedResource):
     """

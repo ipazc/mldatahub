@@ -39,7 +39,6 @@ class TokenizedRequestParser(reqparse.RequestParser):
         pbac_ok = all([bool(token.privileges & privilege) for privilege in required_all_token_privileges]) and \
                 any([bool(token.privileges & privilege) for privilege in required_any_token_privileges])
 
-
         if not pbac_ok:
             abort(401)
 
@@ -81,7 +80,7 @@ def control_access():
             ip_control.num_accesses += 1
 
             session.flush()
-            print("Controlled access to {}".format(remote_ip))
+
             return func(*args, **kwargs)
         return args_wrap
     return func_wrap

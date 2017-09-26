@@ -45,10 +45,13 @@ class DatasetFactory(object):
 
         kwargs['url_prefix'] = url_prefix
 
-        dataset = DatasetDAO(*args, **kwargs)
-        self.session.flush()
+        try:
+            dataset = DatasetDAO(*args, **kwargs)
+        except Exception as ex:
+            dataset = None
+            abort(500, message="Error while creating the dataset.")
 
-        #self.token = TokenFactory(self.token).link_datasets(self.token.token_gui, [dataset.url_prefix])
+        self.session.flush()
 
         return dataset
 

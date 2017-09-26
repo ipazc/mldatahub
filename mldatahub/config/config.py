@@ -35,6 +35,9 @@ class GlobalConfig(object):
     def set_local_storage_uri(self, new_uri):
         self.config_values['local_storage_uri'] = new_uri
 
+    def set_page_size(self, new_page_size):
+        self.config_values['page_size'] = new_page_size
+
     def get_session(self):
         if 'uri' not in self.config_values:
             global_config.set_session_uri("mongodb://localhost:27017/mlhubdata")
@@ -60,5 +63,10 @@ class GlobalConfig(object):
         if 'access_reset_time' not in self.config_values:
             self.config_values['access_reset_time'] = 1 # seconds
         return self.config_values['access_reset_time']
+
+    def get_page_size(self):
+        if 'page_size' not in self.config_values:
+            self.config_values['page_size'] = 25 # 25 elements per page
+
 
 global_config = GlobalConfig()

@@ -161,27 +161,30 @@ class TokenFactory(object):
         can_link_all_inner_tokens = bool(self.token.privileges & Privileges.USER_EDIT_TOKEN)
 
         if not any([can_link_all_inner_tokens, can_link_others]):
-            abort(401)
+            abort(401, message="The token does not have privileges enough for linking datasets.")
+
 
         edit_token = TokenDAO.query.get(token_gui=token_gui)
 
         if edit_token is None:
-            abort(400)
+            abort(400, message="The target token for linkage wasn't found.")
+
+        datasets_url_prefix = [d.url_prefix for d in datasets_url_prefix]
 
         if not can_link_others:
 
             if edit_token.url_prefix != self.token.url_prefix:
-                abort(401)
+                abort(401, message="Not allowed to link datasets to other tokens.")
 
             # Admin tokens can't be modified by normal users.
             if any([edit_token.privileges & Privileges.ADMIN_CREATE_TOKEN,
                     edit_token.privileges & Privileges.ADMIN_EDIT_TOKEN,
                     edit_token.privileges & Privileges.ADMIN_DESTROY_TOKEN,]):
-                abort(401)
+                abort(401, message="Yo man! take your hands out of these tokens!")
 
             # Datasets MUST belong to this token url prefix.
             if not all([prefix.split("/")[0] == self.token.url_prefix for prefix in datasets_url_prefix]):
-                abort(401)
+                abort(401, message="Dataset must belong to the token prefix")
 
         datasets = [DatasetDAO.query.get(url_prefix=url_prefix) for url_prefix in datasets_url_prefix]
         datasets = [dataset for dataset in datasets if dataset is not None and dataset not in edit_token.datasets]
@@ -199,7 +202,7 @@ class TokenFactory(object):
         can_unlink_all_inner_tokens = bool(self.token.privileges & Privileges.USER_EDIT_TOKEN)
 
         if not any([can_unlink_all_inner_tokens, can_unlink_others]):
-            abort(401)
+            abort(401, message="The token does not have privileges enough for linking datasets.")
 
         edit_token = TokenDAO.query.get(token_gui=token_gui)
 
