@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from mldatahub.config.config import global_config
-from mldatahub.factory.dataset_element_factory import DatasetElementFactory
-
 global_config.set_local_storage_uri("examples/tmp_folder")
 global_config.set_session_uri("mongodb://localhost:27017/unittests")
+from mldatahub.factory.dataset_element_factory import DatasetElementFactory
 from werkzeug.exceptions import Unauthorized, BadRequest
 from mldatahub.config.privileges import Privileges
 import unittest

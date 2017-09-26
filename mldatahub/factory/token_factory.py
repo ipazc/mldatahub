@@ -169,7 +169,8 @@ class TokenFactory(object):
         if edit_token is None:
             abort(400, message="The target token for linkage wasn't found.")
 
-        datasets_url_prefix = [d.url_prefix for d in datasets_url_prefix]
+        if len(datasets_url_prefix) > 0 and type(datasets_url_prefix[0]) is DatasetDAO:
+            datasets_url_prefix = [d.url_prefix for d in datasets_url_prefix]
 
         if not can_link_others:
 

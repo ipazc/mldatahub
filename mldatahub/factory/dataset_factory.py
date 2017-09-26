@@ -49,7 +49,7 @@ class DatasetFactory(object):
             dataset = DatasetDAO(*args, **kwargs)
         except Exception as ex:
             dataset = None
-            abort(500, message="Error while creating the dataset.")
+            abort(400, message=str(ex))
 
         self.session.flush()
 

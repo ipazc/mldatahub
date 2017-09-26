@@ -106,13 +106,13 @@ class Dataset(TokenizedResource):
         super().__init__()
         self.get_parser = reqparse.RequestParser()
         self.get_parser.add_argument("url_prefix", type=str, required=False, help="URL prefix to get tokens from.")
-        self.post_parser = reqparse.RequestParser()
+        self.patch_parser = reqparse.RequestParser()
         self.session = global_config.get_session()
         arguments = {
             "url_prefix":
                 {
                     "type": str,
-                    "required": True,
+                    "required": False,
                     "help": "URL prefix for this dataset. Characters \"{}\" not allowed".format(
                         DatasetFactory.illegal_chars),
                     "location": "json"
@@ -120,21 +120,21 @@ class Dataset(TokenizedResource):
             "title":
                 {
                     "type": str,
-                    "required": True,
+                    "required": False,
                     "help": "Title for the dataset.",
                     "location": "json"
                 },
             "description":
                 {
                     "type": str,
-                    "required": True,
+                    "required": False,
                     "help": "Description for the dataset.",
                     "location": "json"
                 },
             "reference":
                 {
                     "type": str,
-                    "required": True,
+                    "required": False,
                     "help": "Reference data (perhaps a Bibtex in string format?)",
                     "location": "json"
                 },
@@ -148,7 +148,7 @@ class Dataset(TokenizedResource):
         }
 
         for argument, kwargs in arguments.items():
-            self.post_parser.add_argument(argument, **kwargs)
+            self.patch_parser.add_argument(argument, **kwargs)
 
     @control_access()
     def get(self, token_prefix, dataset_prefix):
@@ -174,7 +174,12 @@ class Dataset(TokenizedResource):
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
         full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
-        kwargs = self.post_parser.parse_args()
+        kwargs = self.patch_parser.parse_args()
+
+        if "tags" in request.json:
+            kwargs['tags'] = request.json['tags']  # fast fix for split-bug of the tags.
+
+        kwargs = {k:v for k, v in kwargs.items() if v is not None}
 
         DatasetFactory(token).edit_dataset(full_dataset_url_prefix, **kwargs)
 
