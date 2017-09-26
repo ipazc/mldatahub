@@ -165,14 +165,14 @@ class DatasetElement(TokenizedResource):
         return element.serialize(), 200
 
     @control_access()
-    def get(self, token_url_prefix, dataset_url_prefix, element_id):
+    def get(self, token_prefix, dataset_prefix, element_id):
         required_privileges = [
             Privileges.RO_WATCH_DATASET,
             Privileges.ADMIN_EDIT_TOKEN
         ]
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
-        full_dataset_url_prefix = "{}/{}".format(token_url_prefix, dataset_url_prefix)
+        full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
@@ -184,16 +184,22 @@ class DatasetElement(TokenizedResource):
         return result
 
     @control_access()
-    def patch(self, token_url_prefix, dataset_url_prefix, element_id):
+    def patch(self, token_prefix, dataset_prefix, element_id):
         required_privileges = [
             Privileges.EDIT_ELEMENTS,
             Privileges.ADMIN_EDIT_TOKEN
         ]
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
+
         kwargs = self.patch_parser.parse_args()
 
-        full_dataset_url_prefix = "{}/{}".format(token_url_prefix, dataset_url_prefix)
+        if "tags" in request.json:
+            kwargs['tags'] = request.json['tags']  # fast fix for split-bug of the tags.
+
+        kwargs = {k:v for k, v in kwargs.items() if v is not None}
+
+        full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
@@ -202,7 +208,7 @@ class DatasetElement(TokenizedResource):
         return "Done", 200
 
     @control_access()
-    def put(self, token_url_prefix, dataset_url_prefix, element_id):
+    def put(self, token_prefix, dataset_prefix, element_id):
         required_privileges = [
             Privileges.EDIT_ELEMENTS,
             Privileges.ADMIN_EDIT_TOKEN
@@ -210,7 +216,7 @@ class DatasetElement(TokenizedResource):
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
 
-        full_dataset_url_prefix = "{}/{}".format(token_url_prefix, dataset_url_prefix)
+        full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
@@ -221,14 +227,14 @@ class DatasetElement(TokenizedResource):
         return "Done", 200
 
     @control_access()
-    def delete(self, token_url_prefix, dataset_url_prefix, element_id):
+    def delete(self, token_prefix, dataset_prefix, element_id):
         required_privileges = [
             Privileges.DESTROY_ELEMENTS,
             Privileges.ADMIN_DESTROY_TOKEN
         ]
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
-        full_dataset_url_prefix = "{}/{}".format(token_url_prefix, dataset_url_prefix)
+        full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
