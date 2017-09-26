@@ -90,7 +90,8 @@ class Datasets(TokenizedResource):
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
         kwargs = self.post_parser.parse_args()
-        kwargs['tags'] = request.json['tags'] # fast fix for split-bug of the tags.
+        if 'tags' in request.json:
+            kwargs['tags'] = request.json['tags'] # fast fix for split-bug of the tags.
 
         dataset = DatasetFactory(token).create_dataset(**kwargs)
 

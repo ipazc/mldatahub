@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from bson import ObjectId
 
 from flask_restful import abort
 from mldatahub.config.config import global_config
@@ -60,6 +61,8 @@ class DatasetElementFactory(object):
             abort(401)
 
         kwargs['dataset'] = self.dataset
+        if 'file_ref_id' not in kwargs:
+            kwargs['file_ref_id'] = None
 
         dataset_element = DatasetElementDAO(**kwargs)
         self.session.flush()
@@ -124,7 +127,7 @@ class DatasetElementFactory(object):
         if not any([can_view_inner_element, can_view_others_elements]):
             abort(401)
 
-        return DatasetElementDAO.query.find(dataset_id=self.dataset._id).skip(page).offset(global_config.get_page_size())
+        return DatasetElementDAO.query.find(dict(dataset_id=self.dataset._id)).skip(page).limit(global_config.get_page_size())
 
     def get_element_thumbnail(self, element_id):
         # The get_element_info() method is going to make all the required checks for the retrieval of the thumbnail.

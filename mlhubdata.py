@@ -3,7 +3,7 @@
 from flask import Flask
 from flask_restful import Api
 from mldatahub.api.dataset import Datasets, Dataset
-from mldatahub.api.dataset_element import DatasetElements, DatasetElement
+from mldatahub.api.dataset_element import DatasetElements, DatasetElement, DatasetElementContent
 
 from mldatahub.api.token import Tokens, Token, TokenLinker
 
@@ -22,6 +22,6 @@ if __name__ == '__main__':
     api.add_resource(Dataset, '/datasets/<token_prefix>/<dataset_prefix>')
     api.add_resource(DatasetElements, '/datasets/<token_prefix>/<dataset_prefix>/elements')
     api.add_resource(DatasetElement, '/datasets/<token_prefix>/<dataset_prefix>/elements/<element_id>')
-
+    api.add_resource(DatasetElementContent, '/datasets/<token_prefix>/<dataset_prefix>/elements/<element_id>/content')
     app.run(host="localhost", debug=True, threaded=True)
 

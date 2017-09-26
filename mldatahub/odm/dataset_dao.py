@@ -131,12 +131,11 @@ class DatasetElementDAO(MappedClass):
 
     def serialize(self):
         fields = ["title", "description", "_id",
-                  "addition_date", "modification_date"]
+                  "addition_date", "modification_date", "tags"]
 
         response = {f: str(self[f]) for f in fields}
-        #response['tags'] = [str(tag) for tag in self.tags]
-        response['tags'] = self.tags # If this works, append as a field instead.
         response['comments_count'] = len(self.comments)
+        response['has_content'] = self.file_ref_id is not None
 
         return response
 

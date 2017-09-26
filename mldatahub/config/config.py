@@ -67,6 +67,6 @@ class GlobalConfig(object):
     def get_page_size(self):
         if 'page_size' not in self.config_values:
             self.config_values['page_size'] = 25 # 25 elements per page
-
+        return self.config_values['page_size']
 
 global_config = GlobalConfig()

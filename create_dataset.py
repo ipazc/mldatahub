@@ -30,6 +30,35 @@ print(response.json())
 response = requests.get("http://localhost:5000/datasets", params={'_tok': token})
 print(response.json())
 
-response = requests.delete("http://localhost:5000/datasets/{}".format(dataset_url), params={'_tok': token})
+#response = requests.delete("http://localhost:5000/datasets/{}".format(dataset_url), params={'_tok': token})
+#print(response.json())
+
+# Let's get elements from the dataset
+response = requests.get("http://localhost:5000/datasets/{}".format(dataset_url), params={'_tok': token})
 print(response.json())
 
+response = requests.get("http://localhost:5000/datasets/{}/elements".format(dataset_url), params={'_tok': token})
+print(response.json())
+
+# Let's add a new element to the dataset:
+#response = requests.post("http://localhost:5000/datasets/{}/elements".format(dataset_url), params={'_tok': token},
+#                         json={'title': 'element1', 'description':'example desc', 'tags': ['test', 'age: 1']})
+
+#element_id = response.json()
+#print("written element: {}".format(element_id))
+
+response = requests.get("http://localhost:5000/datasets/{}/elements".format(dataset_url), params={'_tok': token})
+print("Elements:",response.json())
+
+#response = requests.put("http://localhost:5000/datasets/{}/elements/{}".format(dataset_url, "59ca645cb9a7c03c3e5dfa40"), params={'_tok': token}, data=b"hello!!!")
+#print(response)
+response = requests.get("http://localhost:5000/datasets/{}/elements/{}".format(dataset_url, "59ca645cb9a7c03c3e5dfa40"), params={'_tok': token})
+print(response.json())
+
+response = requests.get("http://localhost:5000/datasets/{}/elements/{}/content".format(dataset_url, "59ca645cb9a7c03c3e5dfa40"), params={'_tok': token})
+print(response.content)
+
+response = requests.patch("http://localhost:5000/datasets/{}/elements/{}".format(dataset_url, "59ca645cb9a7c03c3e5dfa40"), params={'_tok': token}, json={'title': "hellao"})
+print(response)
+response = requests.delete("http://localhost:5000/datasets/{}/elements/{}".format(dataset_url, "59ca645cb9a7c03c3e5dfa40"), params={'_tok': token})
+print(response)

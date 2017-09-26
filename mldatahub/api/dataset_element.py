@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from io import BytesIO
+from bson import ObjectId
 from flask import send_file, request
 from flask_restful import reqparse
 from mldatahub.api.tokenized_resource import TokenizedResource, control_access
@@ -95,6 +96,9 @@ class DatasetElements(TokenizedResource):
         if "content" not in kwargs and "http_ref" not in kwargs:
             kwargs["http_ref"] = "unknown"
 
+        if 'tags' in request.json:
+            kwargs['tags'] = request.json['tags'] # fast fix for split-bug of the tags.
+
         full_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         dataset = DatasetFactory(token).get_dataset(full_prefix)
@@ -103,15 +107,13 @@ class DatasetElements(TokenizedResource):
 
         self.session.flush()
 
-        return element._id, 201
+        return str(element._id), 201
 
 
 class DatasetElement(TokenizedResource):
 
     def __init__(self):
         super().__init__()
-        self.get_parser = reqparse.RequestParser()
-        self.get_parser.add_argument("url_prefix", type=str, required=False, help="URL prefix to get tokens from.")
         self.patch_parser = reqparse.RequestParser()
         self.session = global_config.get_session()
         arguments = {
@@ -149,22 +151,6 @@ class DatasetElement(TokenizedResource):
             self.patch_parser.add_argument(argument, **kwargs)
 
     @control_access()
-    def head(self, token_url_prefix, dataset_url_prefix, element_id):
-        required_privileges = [
-            Privileges.RO_WATCH_DATASET,
-            Privileges.ADMIN_EDIT_TOKEN
-        ]
-
-        _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
-        full_dataset_url_prefix = "{}/{}".format(token_url_prefix, dataset_url_prefix)
-
-        dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
-
-        element = DatasetElementFactory(token, dataset).get_element_info(element_id)
-
-        return element.serialize(), 200
-
-    @control_access()
     def get(self, token_prefix, dataset_prefix, element_id):
         required_privileges = [
             Privileges.RO_WATCH_DATASET,
@@ -176,12 +162,9 @@ class DatasetElement(TokenizedResource):
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
-        content = DatasetElementFactory(token, dataset).get_element_content(element_id)
+        element = DatasetElementFactory(token, dataset).get_element_info(ObjectId(element_id))
 
-        with BytesIO(content) as fp:
-            result = send_file(fp)
-
-        return result
+        return element.serialize(), 200
 
     @control_access()
     def patch(self, token_prefix, dataset_prefix, element_id):
@@ -203,26 +186,7 @@ class DatasetElement(TokenizedResource):
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
-        DatasetElementFactory(token, dataset).edit_element(element_id, **kwargs)
-
-        return "Done", 200
-
-    @control_access()
-    def put(self, token_prefix, dataset_prefix, element_id):
-        required_privileges = [
-            Privileges.EDIT_ELEMENTS,
-            Privileges.ADMIN_EDIT_TOKEN
-        ]
-
-        _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
-
-        full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
-
-        dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
-
-        content = request.stream.read()
-
-        DatasetElementFactory(token, dataset).edit_element(element_id, content=content)
+        DatasetElementFactory(token, dataset).edit_element(ObjectId(element_id), **kwargs)
 
         return "Done", 200
 
@@ -238,6 +202,47 @@ class DatasetElement(TokenizedResource):
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
-        DatasetElementFactory(token, dataset).destroy_element(element_id)
+        DatasetElementFactory(token, dataset).destroy_element(ObjectId(element_id))
+
+        return "Done", 200
+
+
+class DatasetElementContent(TokenizedResource):
+    def __init__(self):
+        super().__init__()
+        self.session = global_config.get_session()
+
+    @control_access()
+    def get(self, token_prefix, dataset_prefix, element_id):
+        required_privileges = [
+            Privileges.RO_WATCH_DATASET,
+            Privileges.ADMIN_EDIT_TOKEN
+        ]
+
+        _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
+        full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
+
+        dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
+
+        content = DatasetElementFactory(token, dataset).get_element_content(ObjectId(element_id))
+
+        return send_file(BytesIO(content), mimetype="application/octet-stream")
+
+    @control_access()
+    def put(self, token_prefix, dataset_prefix, element_id):
+        required_privileges = [
+            Privileges.EDIT_ELEMENTS,
+            Privileges.ADMIN_EDIT_TOKEN
+        ]
+
+        _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
+
+        full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
+
+        dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
+
+        content = request.stream.read()
+        print("Putting the content {} in the element {}".format(content, element_id))
+        DatasetElementFactory(token, dataset).edit_element(ObjectId(element_id), content=content)
 
         return "Done", 200
