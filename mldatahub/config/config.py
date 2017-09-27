@@ -4,7 +4,6 @@ from dateutil.relativedelta import relativedelta
 from ming import create_datastore
 from ming.odm import ThreadLocalODMSession
 import datetime
-from mldatahub.storage.local.local_storage import LocalStorage
 
 __author__ = 'Iván de Paz Centeno'
 
@@ -38,6 +37,12 @@ class GlobalConfig(object):
     def set_page_size(self, new_page_size):
         self.config_values['page_size'] = new_page_size
 
+    def set_save_interval(self, new_save_interval):
+        self.config_values['save_interval'] = new_save_interval
+
+    def set_garbage_collector_timer_interval(self, new_interval):
+        self.config_values['garbage_collector_time_interval'] = new_interval
+
     def get_session(self):
         if 'uri' not in self.config_values:
             global_config.set_session_uri("mongodb://localhost:27017/mlhubdata")
@@ -51,12 +56,13 @@ class GlobalConfig(object):
             self.config_values['local_storage_uri'] = 'storage'
 
         if self.local_storage is None:
+            from mldatahub.storage.local.local_storage import LocalStorage
             self.local_storage = LocalStorage(self.config_values['local_storage_uri'])
         return self.local_storage
 
     def get_max_access_times(self):
         if 'max_access_times' not in self.config_values:
-            self.config_values['max_access_times'] = 50
+            self.config_values['max_access_times'] = 250
         return self.config_values['max_access_times']
 
     def get_access_reset_time(self):
@@ -68,5 +74,15 @@ class GlobalConfig(object):
         if 'page_size' not in self.config_values:
             self.config_values['page_size'] = 100  # 100 elements per page
         return self.config_values['page_size']
+
+    def get_save_interval(self):
+        if 'save_interval' not in self.config_values:
+            self.config_values['save_interval'] = 180  # 3 minutes
+        return self.config_values['save_interval']
+
+    def get_garbage_collector_timer_interval(self):
+        if 'garbage_collector_time_interval' not in self.config_values:
+            self.config_values['garbage_collector_time_interval'] = 600  # 10 minutes
+        return self.config_values['garbage_collector_time_interval']
 
 global_config = GlobalConfig()

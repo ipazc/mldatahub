@@ -17,3 +17,6 @@ class GenericStorage(object):
 
     def delete_file_content(self, file_id):
         pass
+
+    def get_files_set(self):
+        pass
