@@ -77,10 +77,10 @@ class DatasetDAO(MappedClass):
                   "url_prefix"]
 
         response = {f: str(self[f]) for f in fields}
-        #response['tags'] = [str(tag) for tag in self.tags]
-        response['tags'] = self.tags # If this works, append as a field instead.
         response['comments_count'] = len(self.comments)
         response['elements_count'] = len(self.elements)
+        response['tags'] = [t for t in self.tags]
+
         return response
 
     def has_element(self, element):
@@ -131,13 +131,13 @@ class DatasetElementDAO(MappedClass):
 
     def serialize(self):
         fields = ["title", "description", "_id",
-                  "addition_date", "modification_date", "tags",
+                  "addition_date", "modification_date",
                   "http_ref"]
 
         response = {f: str(self[f]) for f in fields}
         response['comments_count'] = len(self.comments)
         response['has_content'] = self.file_ref_id is not None
-
+        response['tags'] = [t for t in self.tags]
         return response
 
 

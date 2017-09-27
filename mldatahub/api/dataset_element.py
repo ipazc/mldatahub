@@ -223,14 +223,11 @@ class DatasetElementContent(TokenizedResource):
         ]
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
-        print("HERE?")
         full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
-        print("HERE2?")
 
         content = DatasetElementFactory(token, dataset).get_element_content(ObjectId(element_id))
-        print("HERE3?")
 
         return send_file(BytesIO(content), mimetype="application/octet-stream")
 
@@ -248,7 +245,6 @@ class DatasetElementContent(TokenizedResource):
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
         content = request.stream.read()
-        print("Putting the content {} in the element {}".format(content, element_id))
         DatasetElementFactory(token, dataset).edit_element(ObjectId(element_id), content=content)
 
         return "Done", 200
