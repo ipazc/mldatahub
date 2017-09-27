@@ -61,12 +61,12 @@ class GlobalConfig(object):
 
     def get_access_reset_time(self):
         if 'access_reset_time' not in self.config_values:
-            self.config_values['access_reset_time'] = 1 # seconds
+            self.config_values['access_reset_time'] = 1  # seconds
         return self.config_values['access_reset_time']
 
     def get_page_size(self):
         if 'page_size' not in self.config_values:
-            self.config_values['page_size'] = 25 # 25 elements per page
+            self.config_values['page_size'] = 100  # 100 elements per page
         return self.config_values['page_size']
 
 global_config = GlobalConfig()

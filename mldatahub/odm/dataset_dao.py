@@ -131,7 +131,8 @@ class DatasetElementDAO(MappedClass):
 
     def serialize(self):
         fields = ["title", "description", "_id",
-                  "addition_date", "modification_date", "tags"]
+                  "addition_date", "modification_date", "tags",
+                  "http_ref"]
 
         response = {f: str(self[f]) for f in fields}
         response['comments_count'] = len(self.comments)

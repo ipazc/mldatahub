@@ -127,7 +127,7 @@ class DatasetElementFactory(object):
         if not any([can_view_inner_element, can_view_others_elements]):
             abort(401)
 
-        return DatasetElementDAO.query.find(dict(dataset_id=self.dataset._id)).skip(page).limit(global_config.get_page_size())
+        return DatasetElementDAO.query.find(dict(dataset_id=self.dataset._id)).skip(page*global_config.get_page_size()).limit(global_config.get_page_size())
 
     def get_element_thumbnail(self, element_id):
         # The get_element_info() method is going to make all the required checks for the retrieval of the thumbnail.

@@ -18,7 +18,7 @@ class DatasetElements(TokenizedResource):
     def __init__(self):
         super().__init__()
         self.get_parser = reqparse.RequestParser()
-        self.get_parser.add_argument("page", type=int, required=False, help="Page number to retrieve.")
+        self.get_parser.add_argument("page", type=int, required=False, help="Page number to retrieve.", default=0)
         self.post_parser = reqparse.RequestParser()
         self.session = global_config.get_session()
 
@@ -69,12 +69,15 @@ class DatasetElements(TokenizedResource):
         ]
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
+        args = self.get_parser.parse_args()
 
         full_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         dataset = DatasetFactory(token).get_dataset(full_prefix)
 
-        elements_info = DatasetElementFactory(token, dataset).get_elements_info()
+        page = args['page']
+
+        elements_info = DatasetElementFactory(token, dataset).get_elements_info(page)
 
         return [element.serialize() for element in elements_info]
 
@@ -97,7 +100,7 @@ class DatasetElements(TokenizedResource):
             kwargs["http_ref"] = "unknown"
 
         if 'tags' in request.json:
-            kwargs['tags'] = request.json['tags'] # fast fix for split-bug of the tags.
+            kwargs['tags'] = request.json['tags']  # fast fix for split-bug of the tags.
 
         full_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
@@ -220,11 +223,14 @@ class DatasetElementContent(TokenizedResource):
         ]
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
+        print("HERE?")
         full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
+        print("HERE2?")
 
         content = DatasetElementFactory(token, dataset).get_element_content(ObjectId(element_id))
+        print("HERE3?")
 
         return send_file(BytesIO(content), mimetype="application/octet-stream")
 
