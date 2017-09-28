@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from mldatahub.config.config import global_config
+from mldatahub.factory.dataset_factory import DatasetFactory
+
 global_config.set_local_storage_uri("examples/tmp_folder")
 global_config.set_session_uri("mongodb://localhost:27017/unittests")
 from mldatahub.factory.dataset_element_factory import DatasetElementFactory
@@ -329,6 +331,28 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         element_watched = DatasetElementFactory(admin, dataset2).get_element_info(element3._id)
         self.assertEqual(element_watched.title, "example3")
+
+    def testDatasetElementCreationLimit(self):
+        """
+        Factory limits creation of dataset's elements depending on the token used to create it.
+        """
+        creator = TokenDAO("normal user privileged", 1, 1, "user1", privileges=Privileges.CREATE_DATASET+Privileges.ADD_ELEMENTS)
+
+        dataset = DatasetDAO("user1/dataset1", "example_dataset", "dataset for testing purposes", "none",
+                             tags=["example", "0"])
+
+        self.session.flush()
+
+        # Creator should not be able to create more than 1 element in any dataset
+        creator = creator.link_dataset(dataset)
+
+        element1 = DatasetElementFactory(creator, dataset).create_element(title="New element1", description="Description unknown",
+                                                               tags=["example_tag"], content=b"hello")
+        dataset = self.session.refresh(dataset)
+
+        with self.assertRaises(Unauthorized) as ex:
+            element2 = DatasetElementFactory(creator, dataset).create_element(title="New element2", description="Description unknown",
+                                                               tags=["example_tag"], content=b"hello")
 
     def tearDown(self):
         DatasetDAO.query.remove()

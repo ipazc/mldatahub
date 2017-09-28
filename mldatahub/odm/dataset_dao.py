@@ -31,14 +31,21 @@ class DatasetDAO(MappedClass):
     elements = RelationProperty('DatasetElementDAO')
     comments = RelationProperty('DatasetCommentDAO')
     tokens = RelationProperty('TokenDAO')
+    fork_count = FieldProperty(schema.Int)
+    forked_from_id = ForeignIdProperty('DatasetDAO')
+    forked_from = RelationProperty('DatasetDAO')
 
-    def __init__(self, url_prefix, title, description, reference, tags=None, creation_date=now(), modification_date=now()):
+    def __init__(self, url_prefix, title, description, reference, tags=None, creation_date=now(), modification_date=now(),
+                 forked_count=0, forked_from_dataset=None, forked_from_dataset_id=None):
         with lock:
             previous_dset = DatasetDAO.query.get(url_prefix=url_prefix)
             if previous_dset is not None or url_prefix in taken_url_prefixes:
                 raise Exception("Url prefix already taken.")
             else:
                 taken_url_prefixes[url_prefix] = 1
+
+        if forked_from_dataset_id is None and forked_from_dataset is not None:
+            forked_from_dataset_id = forked_from_dataset._id
 
         kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__"]}
         super().__init__(**kwargs)
@@ -68,24 +75,27 @@ class DatasetDAO(MappedClass):
                 del taken_url_prefixes[url_prefix]
 
     def update(self):
-        return DatasetDAO.query.get(_id=self._id)
+        return session.refresh(self)
 
     def serialize(self):
 
         fields = ["title", "description", "reference",
                   "creation_date", "modification_date",
-                  "url_prefix"]
+                  "url_prefix", "fork_count"]
 
         response = {f: str(self[f]) for f in fields}
         response['comments_count'] = len(self.comments)
         response['elements_count'] = len(self.elements)
         response['tags'] = [t for t in self.tags]
+        if self.forked_from is not None:
+            response['fork_father'] = self.forked_from.url_prefix
+        else:
+            response['fork_father'] = None
 
         return response
 
     def has_element(self, element):
         return DatasetElementDAO.query.get(_id=element._id, dataset_id=self._id) is not None
-        #return element._id in [element._id for element in self.elements]
 
 
 class DatasetElementDAO(MappedClass):
@@ -126,8 +136,7 @@ class DatasetElementDAO(MappedClass):
         super().delete()
 
     def update(self):
-        session.refresh(self)
-        return DatasetElementDAO.query.get(_id=self._id)
+        return session.refresh(self)
 
     def serialize(self):
         fields = ["title", "description", "_id",
@@ -167,11 +176,10 @@ class DatasetCommentDAO(MappedClass):
         return cls(**init_dict)
 
     def update(self):
-        return DatasetCommentDAO.query.get(_id=self._id)
+        return session.refresh(self)
 
     def delete(self):
         DatasetCommentDAO.query.remove({'_id': self._id})
-
 
 
 class DatasetElementCommentDAO(MappedClass):
@@ -200,7 +208,7 @@ class DatasetElementCommentDAO(MappedClass):
         return cls(**init_dict)
 
     def update(self):
-        return DatasetElementCommentDAO.query.get(_id=self._id)
+        return session.refresh(self)
 
     def delete(self):
         DatasetElementCommentDAO.query.remove({'_id': self._id})

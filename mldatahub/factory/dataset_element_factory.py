@@ -23,11 +23,11 @@ class DatasetElementFactory(object):
         can_alter_datasets = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
         # It is a must for token to have admin privileges or to have access to this dataset.
-        if not can_alter_datasets and self.dataset not in self.token.datasets:
+        if not can_alter_datasets and not self.token.has_dataset(self.dataset):
             abort(401)
 
     def _dataset_limit_reached(self):
-        return len(self.dataset.elements) > self.token.max_dataset_size
+        return len(self.dataset.elements) >= self.token.max_dataset_size
 
     def create_element(self, **kwargs):
         can_create_inner_element = bool(self.token.privileges & Privileges.ADD_ELEMENTS)

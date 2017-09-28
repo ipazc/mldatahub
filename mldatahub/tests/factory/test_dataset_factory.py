@@ -213,6 +213,20 @@ class TestDatasetFactory(unittest.TestCase):
         with self.assertRaises(Unauthorized) as ex:
             dataset3 =DatasetFactory(watcher).get_dataset(dataset.url_prefix)
 
+    def testDatasetCreationLimit(self):
+        """
+        Factory limits creation of dataset depending on the token used to create it.
+        """
+        creator = TokenDAO("normal user privileged", 1, 1, "user1", privileges=Privileges.CREATE_DATASET)
+
+        # Creator should not be able to create more than 1 dataset
+        dataset1 = DatasetFactory(creator).create_dataset(url_prefix="creator", title="Creator dataset", description="Dataset example creator", reference="Unknown")
+
+        creator = creator.link_dataset(dataset1)
+
+        self.session.flush()
+        with self.assertRaises(Unauthorized) as ex:
+            dataset2 = DatasetFactory(creator).create_dataset(url_prefix="creator2", title="Creator dataset2", description="Dataset2 example creator", reference="Unknown")
 
     def tearDown(self):
         DatasetDAO.query.remove()

@@ -28,7 +28,7 @@ class TokenDAO(MappedClass):
     end_date = FieldProperty(schema.datetime)
     privileges = FieldProperty(schema.Int)
     url_prefix = FieldProperty(schema.String)
-    _dataset= ForeignIdProperty('DatasetDAO', uselist=True)
+    _datasets= ForeignIdProperty('DatasetDAO', uselist=True)
     datasets = RelationProperty('DatasetDAO')
 
     def __init__(self, description, max_dataset_count, max_dataset_size, url_prefix, token_gui=None,
@@ -62,8 +62,7 @@ class TokenDAO(MappedClass):
 
         self.datasets = old_datasets
         session.flush()
-        session.clear()
-        return session.refresh(self)
+        return self.update()
 
     def link_dataset(self, dataset):
         return self.link_datasets([dataset])
@@ -73,6 +72,12 @@ class TokenDAO(MappedClass):
         old_datasets += datasets
         self.datasets = old_datasets
         session.flush()
+        return self.update()
+
+    def has_dataset(self, dataset):
+        return dataset._id in self._datasets
+
+    def update(self):
         return session.refresh(self)
 
     def serialize(self):

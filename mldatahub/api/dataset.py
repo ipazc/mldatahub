@@ -199,3 +199,7 @@ class Dataset(TokenizedResource):
         DatasetFactory(token).destroy_dataset(full_dataset_url_prefix)
 
         return "Done", 200
+
+
+class DatasetForker(TokenizedResource):
+    pass

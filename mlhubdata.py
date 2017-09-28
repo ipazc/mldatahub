@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import os
+
 from flask import Flask
 from flask_restful import Api
-from mldatahub.api.dataset import Datasets, Dataset
+from mldatahub.api.dataset import Datasets, Dataset, DatasetForker
 from mldatahub.api.dataset_element import DatasetElements, DatasetElement, DatasetElementContent
-
 from mldatahub.api.token import Tokens, Token, TokenLinker
 from mldatahub.config.config import global_config
 from mldatahub.observer.garbage_collector import GarbageCollector
@@ -24,6 +23,7 @@ if __name__ == '__main__':
     api.add_resource(TokenLinker, '/tokens/<token_id>/link/<token_prefix>/<dataset_prefix>')
     api.add_resource(Datasets, '/datasets')
     api.add_resource(Dataset, '/datasets/<token_prefix>/<dataset_prefix>')
+    api.add_resource(DatasetForker, '/datasets/<token_prefix>/<dataset_prefix>/fork')
     api.add_resource(DatasetElements, '/datasets/<token_prefix>/<dataset_prefix>/elements')
     api.add_resource(DatasetElement, '/datasets/<token_prefix>/<dataset_prefix>/elements/<element_id>')
     api.add_resource(DatasetElementContent, '/datasets/<token_prefix>/<dataset_prefix>/elements/<element_id>/content')
