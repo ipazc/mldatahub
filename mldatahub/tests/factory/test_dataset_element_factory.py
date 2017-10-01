@@ -50,7 +50,7 @@ class TestDatasetElementFactory(unittest.TestCase):
 
     def test_dataset_element_creation(self):
         """
-        Factory can create dataset's elements
+        Factory can create dataset's elements.
         """
         anonymous = TokenDAO("Anonymous", 1, 1, "anonymous")
 
@@ -119,6 +119,43 @@ class TestDatasetElementFactory(unittest.TestCase):
                                                                   tags=["example_tag"], file_ref_id=element.file_ref_id)
 
         self.assertEqual(element.file_ref_id, new_element.file_ref_id)
+
+
+    def test_dataset_elements_creation(self):
+        """
+        Factory can create multiple dataset's elements at once.
+        """
+        creator = TokenDAO("normal user privileged with link", 1, 3, "user1",
+                           privileges=Privileges.CREATE_DATASET + Privileges.ADD_ELEMENTS
+                           )
+
+        dataset = DatasetDAO("user1/dataset1", "example_dataset", "dataset for testing purposes", "none", tags=["example", "0"])
+
+        self.session.flush()
+
+        creator = creator.link_dataset(dataset)
+
+        # Creator can create elements into the dataset
+        elements_kwargs = [
+            dict(title="New element", description="Description unknown", tags=["example_tag"], content=b"hello"),
+            dict(title="New element2", description="Description unknown2", tags=["example_tag2"], content=b"hello2"),
+            dict(title="New element3", description="Description unknown3", tags=["example_tag3"], content=b"hello3"),
+        ]
+
+        elements = DatasetElementFactory(creator, dataset).create_elements(elements_kwargs)
+
+        self.assertEqual(len(elements), 3)
+
+        content = local_storage.get_file_content(elements[0].file_ref_id)
+        self.assertEqual(content, b"hello")
+        content = local_storage.get_file_content(elements[1].file_ref_id)
+        self.assertEqual(content, b"hello2")
+        content = local_storage.get_file_content(elements[2].file_ref_id)
+        self.assertEqual(content, b"hello3")
+        dataset = dataset.update()
+
+        self.assertEqual(len(dataset.elements), 3)
+
 
     def test_dataset_element_removal(self):
         """
@@ -404,11 +441,12 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         element1 = DatasetElementFactory(creator, dataset).create_element(title="New element1", description="Description unknown",
                                                                tags=["example_tag"], content=b"hello")
-        dataset = self.session.refresh(dataset)
+        dataset = dataset.update()
 
         with self.assertRaises(Unauthorized) as ex:
-            element2 = DatasetElementFactory(creator, dataset).create_element(title="New element2", description="Description unknown",
-                                                               tags=["example_tag"], content=b"hello")
+            element2 = DatasetElementFactory(creator, dataset).create_element(title="New element2",
+                                                                              description="Description unknown",
+                                                                              tags=["example_tag"], content=b"hello")
 
     def test_dataset_elements_info_by_pages(self):
         """

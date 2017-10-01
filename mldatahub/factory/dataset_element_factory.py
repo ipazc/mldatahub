@@ -19,7 +19,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
-from bson import ObjectId
+
 from flask_restful import abort
 from mldatahub.config.config import global_config
 from mldatahub.config.privileges import Privileges
@@ -44,8 +44,8 @@ class DatasetElementFactory(object):
         if not can_alter_datasets and not self.token.has_dataset(self.dataset):
             abort(401)
 
-    def _dataset_limit_reached(self):
-        return len(self.dataset.elements) >= self.token.max_dataset_size
+    def _dataset_limit_reached(self, new_elements_count=1):
+        return len(self.dataset.elements) + new_elements_count > self.token.max_dataset_size
 
     def create_element(self, **kwargs):
         can_create_inner_element = bool(self.token.privileges & Privileges.ADD_ELEMENTS)
@@ -55,7 +55,7 @@ class DatasetElementFactory(object):
             abort(401)
 
         if not can_create_others_elements and self._dataset_limit_reached():
-            abort(401)
+            abort(401, message="Dataset limit reached.")
 
         try:
             element_content = kwargs["content"]
@@ -86,6 +86,51 @@ class DatasetElementFactory(object):
         self.session.flush()
 
         return dataset_element
+
+    def create_elements(self, elements_kwargs):
+        can_create_inner_element = bool(self.token.privileges & Privileges.ADD_ELEMENTS)
+        can_create_others_elements = bool(self.token.privileges & Privileges.ADMIN_CREATE_TOKEN)
+
+        if not any([can_create_inner_element, can_create_others_elements]):
+            abort(401)
+
+        if not can_create_others_elements and self._dataset_limit_reached(len(elements_kwargs)):
+            abort(401, message="Dataset limit reached. Can't add this set of elements. There are only {} slots free".format(len(self.dataset.elements) - self.token.max_dataset_size))
+
+        dataset_elements = []
+        for kwargs in elements_kwargs:
+
+            try:
+                element_content = kwargs["content"]
+                del kwargs["content"]
+            except KeyError as ex:
+                element_content = None
+
+            if element_content is None:
+                if 'http_ref' not in kwargs and 'file_ref_id' not in kwargs:
+                    abort(400)
+
+                if 'file_ref_id' in kwargs and not can_create_others_elements:
+                    # Antiexploit: otherwise users might add resources from other tokens over here.
+                    abort(401)
+            else:
+                # We save the file into the storage
+                file_id = self.local_storage.put_file_content(element_content)
+                kwargs['file_ref_id'] = file_id
+
+            if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_create_others_elements:
+                abort(401)
+
+            kwargs['dataset'] = self.dataset
+            if 'file_ref_id' not in kwargs:
+                kwargs['file_ref_id'] = None
+
+            dataset_element = DatasetElementDAO(**kwargs)
+            dataset_elements.append(dataset_element)
+
+        self.session.flush()
+
+        return dataset_elements
 
     def edit_element(self, element_id, **kwargs):
         can_edit_inner_element = bool(self.token.privileges & Privileges.EDIT_ELEMENTS)
@@ -174,14 +219,21 @@ class DatasetElementFactory(object):
 
         return dataset_element
 
-    def get_elements_info(self, page=0):
+    def get_elements_info(self, page=0, options=None):
         can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
         can_view_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
         if not any([can_view_inner_element, can_view_others_elements]):
             abort(401)
 
-        return DatasetElementDAO.query.find(dict(dataset_id=self.dataset._id)).skip(page*global_config.get_page_size()).limit(global_config.get_page_size())
+        if options is not None:
+            query = options
+        else:
+            query = {}
+
+        query["dataset_id"] = self.dataset._id
+
+        return DatasetElementDAO.query.find(query).skip(page*global_config.get_page_size()).limit(global_config.get_page_size())
 
     def get_specific_elements_info(self, elements_id):
         can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
