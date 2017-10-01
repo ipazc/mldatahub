@@ -21,11 +21,11 @@
 # MA  02110-1301, USA.
 
 from flask_restful import abort
+from mldatahub.odm.dataset_dao import DatasetDAO
 from mldatahub.odm.token_dao import TokenDAO
 
 from mldatahub.config.config import global_config, now
 from mldatahub.config.privileges import Privileges
-from mldatahub.odm.dataset_dao import DatasetDAO
 
 __author__ = 'Iván de Paz Centeno'
 
