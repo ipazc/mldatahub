@@ -105,6 +105,7 @@ class GlobalConfig(object):
         if self.local_storage is None:
             from mldatahub.storage.local.local_storage import LocalStorage
             self.local_storage = LocalStorage(self.config_values['local_storage_uri'])
+
         return self.local_storage
 
     def get_storage_cache_file(self):

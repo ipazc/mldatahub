@@ -671,6 +671,99 @@ class TestDatasetElementFactory(unittest.TestCase):
         self.assertEqual(element3.description, "ffff")
         self.assertEqual(local_storage.get_file_content(element3.file_ref_id), b"New Content!")
 
+    def test_clone_element(self):
+        """
+        Factory can clone elements.
+        """
+        editor = TokenDAO("normal user privileged with link", 2, 1, "user1",
+                         privileges=Privileges.RO_WATCH_DATASET + Privileges.EDIT_DATASET + Privileges.ADD_ELEMENTS
+                         )
+
+        dataset = DatasetDAO("user1/dataset1", "example_dataset", "dataset for testing purposes", "none",
+                             tags=["example", "0"])
+        dataset2 = DatasetDAO("user1/dataset2", "example_dataset2", "dataset2 for testing purposes", "none",
+                              tags=["example", "1"])
+
+        self.session.flush()
+
+        editor = editor.link_dataset(dataset)
+
+        file_id1 = local_storage.put_file_content(b"content1")
+        file_id2 = local_storage.put_file_content(b"content2")
+
+        element = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
+        element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
+        element3 = DatasetElementDAO("example3", "none", file_id2, dataset=dataset)
+
+        self.session.flush()
+        dataset = dataset.update()
+        dataset2 = dataset2.update()
+
+        self.assertEqual(len(dataset.elements), 3)
+        self.assertEqual(len(dataset2.elements), 0)
+
+        with self.assertRaises(Unauthorized) as ex:
+            new_element = DatasetElementFactory(editor, dataset).clone_element(element._id, dataset2.url_prefix)
+
+        editor = editor.link_dataset(dataset2)
+        new_element = DatasetElementFactory(editor, dataset).clone_element(element._id, dataset2.url_prefix)
+
+        dataset2 = dataset2.update()
+
+        self.assertEqual(len(dataset2.elements), 1)
+
+        self.assertEqual(new_element.file_ref_id, element.file_ref_id)
+        self.assertEqual(new_element.title, element.title)
+        self.assertEqual(new_element.description, element.description)
+        self.assertEqual(new_element.tags, element.tags)
+        self.assertNotEqual(new_element._id, element._id)
+
+        with self.assertRaises(Unauthorized) as ex:
+            new_element = DatasetElementFactory(editor, dataset).clone_element(element2._id, dataset2.url_prefix)
+
+    def test_clone_elements(self):
+        """
+        Factory can clone multiple elements at once.
+        """
+        editor = TokenDAO("normal user privileged with link", 2, 3, "user1",
+                         privileges=Privileges.RO_WATCH_DATASET + Privileges.EDIT_DATASET + Privileges.ADD_ELEMENTS
+                         )
+
+        dataset = DatasetDAO("user1/dataset1", "example_dataset", "dataset for testing purposes", "none",
+                             tags=["example", "0"])
+        dataset2 = DatasetDAO("user1/dataset2", "example_dataset2", "dataset2 for testing purposes", "none",
+                              tags=["example", "1"])
+
+        self.session.flush()
+
+        editor = editor.link_dataset(dataset)
+
+        file_id1 = local_storage.put_file_content(b"content1")
+        file_id2 = local_storage.put_file_content(b"content2")
+
+        element = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
+        element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
+        element3 = DatasetElementDAO("example3", "none", file_id2, dataset=dataset)
+
+        self.session.flush()
+        dataset = dataset.update()
+        dataset2 = dataset2.update()
+
+        self.assertEqual(len(dataset.elements), 3)
+        self.assertEqual(len(dataset2.elements), 0)
+
+        with self.assertRaises(Unauthorized) as ex:
+            new_elements = DatasetElementFactory(editor, dataset).clone_elements([element._id, element2._id], dataset2.url_prefix)
+
+        editor = editor.link_dataset(dataset2)
+        new_elements = DatasetElementFactory(editor, dataset).clone_elements([element._id, element2._id],
+                                                                            dataset2.url_prefix)
+
+        dataset2 = dataset2.update()
+
+        self.assertEqual(len(dataset.elements), 3)
+        self.assertEqual(len(dataset2.elements), 2)
+
     def tearDown(self):
         DatasetDAO.query.remove()
         DatasetCommentDAO.query.remove()

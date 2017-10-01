@@ -19,10 +19,16 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
-
+from bson import ObjectId
 from flask_restful import abort
+from ming.odm.odmsession import ODMCursor
+from mldatahub.storage.local.local_storage import LocalStorage
+
+from mldatahub.factory.dataset_factory import DatasetFactory
+
 from mldatahub.config.config import global_config
 from mldatahub.config.privileges import Privileges
+from mldatahub.odm.token_dao import TokenDAO
 from mldatahub.odm.dataset_dao import DatasetDAO
 from mldatahub.odm.dataset_dao import DatasetElementDAO
 
@@ -31,11 +37,11 @@ __author__ = 'Iván de Paz Centeno'
 
 class DatasetElementFactory(object):
 
-    def __init__(self, token, dataset):
+    def __init__(self, token: TokenDAO, dataset: DatasetDAO):
         self.token = token
         self.dataset = dataset
         self.session = global_config.get_session()
-        self.local_storage = global_config.get_local_storage()
+        self.local_storage = global_config.get_local_storage() # type: LocalStorage
 
         # Can token modify dataset? let's check.
         can_alter_datasets = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
@@ -44,10 +50,10 @@ class DatasetElementFactory(object):
         if not can_alter_datasets and not self.token.has_dataset(self.dataset):
             abort(401)
 
-    def _dataset_limit_reached(self, new_elements_count=1):
+    def _dataset_limit_reached(self, new_elements_count=1) -> bool:
         return len(self.dataset.elements) + new_elements_count > self.token.max_dataset_size
 
-    def create_element(self, **kwargs):
+    def create_element(self, **kwargs) -> DatasetElementDAO:
         can_create_inner_element = bool(self.token.privileges & Privileges.ADD_ELEMENTS)
         can_create_others_elements = bool(self.token.privileges & Privileges.ADMIN_CREATE_TOKEN)
 
@@ -87,7 +93,7 @@ class DatasetElementFactory(object):
 
         return dataset_element
 
-    def create_elements(self, elements_kwargs):
+    def create_elements(self, elements_kwargs) -> list:
         can_create_inner_element = bool(self.token.privileges & Privileges.ADD_ELEMENTS)
         can_create_others_elements = bool(self.token.privileges & Privileges.ADMIN_CREATE_TOKEN)
 
@@ -132,7 +138,7 @@ class DatasetElementFactory(object):
 
         return dataset_elements
 
-    def edit_element(self, element_id, **kwargs):
+    def edit_element(self, element_id:ObjectId, **kwargs) -> DatasetElementDAO:
         can_edit_inner_element = bool(self.token.privileges & Privileges.EDIT_ELEMENTS)
         can_edit_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
@@ -166,7 +172,7 @@ class DatasetElementFactory(object):
 
         return dataset_element
 
-    def edit_elements(self, elements_kwargs):
+    def edit_elements(self, elements_kwargs) -> ODMCursor:
         can_edit_inner_element = bool(self.token.privileges & Privileges.EDIT_ELEMENTS)
         can_edit_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
@@ -202,7 +208,54 @@ class DatasetElementFactory(object):
 
         return dataset_elements
 
-    def get_element_info(self, element_id):
+    def clone_element(self, element_id:ObjectId, dest_dataset_url_prefix:str) -> DatasetElementDAO:
+        can_edit_inner_element = bool(self.token.privileges & (Privileges.RO_WATCH_DATASET +
+                                                               Privileges.EDIT_DATASET + Privileges.ADD_ELEMENTS))
+        can_edit_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
+
+        if not any([can_edit_inner_element, can_edit_others_elements]):
+            abort(401)
+
+
+        dataset = DatasetFactory(self.token).get_dataset(dest_dataset_url_prefix)
+
+        d_e_f = DatasetElementFactory(self.token, dataset)
+
+        if not can_edit_others_elements and d_e_f._dataset_limit_reached():
+            abort(401,message="Dataset limit reached.")
+
+        element = self.get_element_info(element_id)
+
+        new_element = dataset.add_element(element.title, element.description, element.file_ref_id, element.http_ref, list(element.tags))
+
+        self.session.flush()
+
+        return new_element
+
+    def clone_elements(self, elements_ids: list, dest_dataset_url_prefix: str) -> list:
+        can_edit_inner_element = bool(self.token.privileges & (Privileges.RO_WATCH_DATASET +
+                                                               Privileges.EDIT_DATASET + Privileges.ADD_ELEMENTS))
+        can_edit_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
+
+        if not any([can_edit_inner_element, can_edit_others_elements]):
+            abort(401)
+
+        dataset = DatasetFactory(self.token).get_dataset(dest_dataset_url_prefix)
+
+        d_e_f = DatasetElementFactory(self.token, dataset)
+
+        if not can_edit_others_elements and d_e_f._dataset_limit_reached(len(elements_ids)):
+            abort(401, message="Dataset limit reached. Can't add this set of elements. There are only {} slots free".format(len(self.dataset.elements) - self.token.max_dataset_size))
+
+        elements = self.get_specific_elements_info(elements_ids)
+
+        new_elements = [dataset.add_element(element.title, element.description, element.file_ref_id, element.http_ref, list(element.tags)) for element in elements]
+
+        self.session.flush()
+
+        return new_elements
+
+    def get_element_info(self, element_id:ObjectId) -> DatasetElementDAO:
         can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
         can_view_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
@@ -219,7 +272,7 @@ class DatasetElementFactory(object):
 
         return dataset_element
 
-    def get_elements_info(self, page=0, options=None):
+    def get_elements_info(self, page=0, options=None) -> ODMCursor:
         can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
         can_view_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
@@ -235,7 +288,7 @@ class DatasetElementFactory(object):
 
         return DatasetElementDAO.query.find(query).skip(page*global_config.get_page_size()).limit(global_config.get_page_size())
 
-    def get_specific_elements_info(self, elements_id):
+    def get_specific_elements_info(self, elements_id:list) -> ODMCursor:
         can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
         can_view_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
@@ -247,7 +300,7 @@ class DatasetElementFactory(object):
 
         return DatasetElementDAO.query.find({"dataset_id": self.dataset._id, "_id": { "$in" : elements_id }})
 
-    def get_element_thumbnail(self, element_id):
+    def get_element_thumbnail(self, element_id:ObjectId) -> bytes:
         # The get_element_info() method is going to make all the required checks for the retrieval of the thumbnail.
         dataset_element = self.get_element_info(element_id)
 
@@ -260,7 +313,7 @@ class DatasetElementFactory(object):
 
         return thumbnail
 
-    def get_element_content(self, element_id):
+    def get_element_content(self, element_id:ObjectId) -> bytes:
         # The get_element_info() method is going to make all the required checks for the retrieval of the thumbnail.
         dataset_element = self.get_element_info(element_id)
 
@@ -271,7 +324,7 @@ class DatasetElementFactory(object):
 
         return content
 
-    def get_elements_content(self, elements_id):
+    def get_elements_content(self, elements_id:list) -> dict:
         # The get_specific_elements_info() method is going to make all the required checks for the retrieval of the thumbnail.
         dataset_elements = self.get_specific_elements_info(elements_id)
 
@@ -284,7 +337,7 @@ class DatasetElementFactory(object):
         contents = {element_id: self.local_storage.get_file_content(element.file_ref_id) for element_id, element in zip(elements_id, dataset_elements)}
         return contents
 
-    def destroy_element(self, element_id):
+    def destroy_element(self, element_id:ObjectId) -> DatasetDAO:
         can_destroy_inner_element = bool(self.token.privileges & Privileges.DESTROY_ELEMENTS)
         can_destroy_others_elements = bool(self.token.privileges & Privileges.ADMIN_DESTROY_TOKEN)
 
@@ -309,7 +362,7 @@ class DatasetElementFactory(object):
 
         return self.dataset
 
-    def destroy_elements(self, elements_ids):
+    def destroy_elements(self, elements_ids:list) -> DatasetDAO:
         can_destroy_inner_element = bool(self.token.privileges & Privileges.DESTROY_ELEMENTS)
         can_destroy_others_elements = bool(self.token.privileges & Privileges.ADMIN_DESTROY_TOKEN)
 

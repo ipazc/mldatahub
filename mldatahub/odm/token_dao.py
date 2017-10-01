@@ -97,6 +97,9 @@ class TokenDAO(MappedClass):
     def has_dataset(self, dataset):
         return dataset._id in self._datasets
 
+    def has_dataset_id(self, dataset_id):
+        return dataset_id in self._datasets
+
     def update(self):
         return session.refresh(self)
 

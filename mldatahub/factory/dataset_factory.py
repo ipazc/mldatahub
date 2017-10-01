@@ -21,6 +21,8 @@
 # MA  02110-1301, USA.
 
 from flask_restful import abort
+from mldatahub.odm.token_dao import TokenDAO
+
 from mldatahub.config.config import global_config, now
 from mldatahub.config.privileges import Privileges
 from mldatahub.odm.dataset_dao import DatasetDAO
@@ -32,11 +34,11 @@ class DatasetFactory(object):
 
     illegal_chars = "/*;:,.ç´`+Ç¨^><¿?'¡¿!\"·$%&()@~¬"
 
-    def __init__(self, token):
+    def __init__(self, token:TokenDAO):
         self.token = token
         self.session = global_config.get_session()
 
-    def create_dataset(self, *args, **kwargs):
+    def create_dataset(self, *args, **kwargs) -> DatasetDAO:
         can_create_inner_dataset = bool(self.token.privileges & Privileges.CREATE_DATASET)
         can_create_others_dataset = bool(self.token.privileges & Privileges.ADMIN_CREATE_TOKEN)
         illegal_chars = self.illegal_chars
@@ -75,10 +77,10 @@ class DatasetFactory(object):
 
         return dataset
 
-    def _dataset_limit_reached(self):
+    def _dataset_limit_reached(self) -> bool:
         return len(self.token.datasets) >= self.token.max_dataset_count
 
-    def edit_dataset(self, edit_url_prefix, *args, **kwargs):
+    def edit_dataset(self, edit_url_prefix:str, *args, **kwargs) -> DatasetDAO:
         can_edit_inner_dataset = bool(self.token.privileges & Privileges.EDIT_DATASET)
         can_edit_others_dataset = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
         illegal_chars = self.illegal_chars
@@ -112,15 +114,15 @@ class DatasetFactory(object):
         edit_dataset = DatasetDAO.query.get(url_prefix=edit_url_prefix)
 
         if edit_dataset is None:
-            abort(400)
+            abort(404, message="Dataset wasn't found.")
 
         if not can_edit_others_dataset:
             if edit_dataset.url_prefix.split("/")[0] != self.token.url_prefix:
-                abort(401)
+                abort(401, message="Dataset can't be accessed.")
 
             # Fix: this token can only edit a dataset if the dataset is linked to it.
             if edit_dataset not in self.token.datasets:
-                abort(401)
+                abort(401, message="Dataset can't be accessed.")
 
         kwargs['modification_date'] = now()
 
@@ -135,7 +137,7 @@ class DatasetFactory(object):
 
         return edit_dataset
 
-    def get_dataset(self, url_prefix):
+    def get_dataset(self, url_prefix:str) -> DatasetDAO:
         can_view_inner_dataset = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
         can_view_others_dataset = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
@@ -143,34 +145,34 @@ class DatasetFactory(object):
             abort(401)
 
         if url_prefix is None or url_prefix == "":
-            abort(400)
+            abort(400, message="Url prefix of the dataset is required")
 
         view_dataset = DatasetDAO.query.get(url_prefix=url_prefix)
 
         if view_dataset is None:
-            abort(400)
+            abort(404, message="Dataset wasn't found.")
 
-        if not can_view_others_dataset and view_dataset not in self.token.datasets:
-            abort(401)
+        if not can_view_others_dataset and not self.token.has_dataset(view_dataset):
+            abort(401, message="Dataset can't be accessed.")
 
         return view_dataset
 
-    def destroy_dataset(self, url_prefix):
+    def destroy_dataset(self, url_prefix:str) -> bool:
         can_destroy_inner_dataset = bool(self.token.privileges & Privileges.DESTROY_DATASET)
         can_destroy_others_dataset = bool(self.token.privileges & Privileges.ADMIN_DESTROY_TOKEN)
 
         if not any([can_destroy_inner_dataset, can_destroy_others_dataset]):
             abort(401)
 
-        if url_prefix == "":
-            abort(400)
+        if url_prefix is None or url_prefix == "":
+            abort(400, message="Url prefix of the dataset is required")
 
         if not can_destroy_others_dataset and url_prefix.split("/")[0] != self.token.url_prefix:
-            abort(401)
+            abort(401, message="Dataset can't be accessed.")
 
         dataset = DatasetDAO.query.get(url_prefix=url_prefix)
         if dataset is None:
-            abort(400)
+            abort(404, message="Dataset wasn't found.")
 
         dataset.delete()
         self.session.flush()
