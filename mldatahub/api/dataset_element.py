@@ -24,6 +24,8 @@ from io import BytesIO
 from bson import ObjectId
 from flask import send_file, request
 from flask_restful import reqparse
+from pyzip import PyZip
+
 from mldatahub.api.tokenized_resource import TokenizedResource, control_access
 from mldatahub.config.config import global_config
 from mldatahub.config.privileges import Privileges
@@ -306,12 +308,11 @@ class DatasetElementContentBundle(TokenizedResource):
             kwargs['ids'] = request.json['ids']  # fast fix for split-bug of the tags.
 
         ids = kwargs['ids']
-        if len(ids) > global_config.get_page_size():
-            abort(416, message="")
-
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
-        content = DatasetElementFactory(token, dataset).get_element_content(ObjectId(element_id))
+        elements_content = DatasetElementFactory(token, dataset).get_elements_content([ObjectId(id) for id in ids])
 
-        return send_file(BytesIO(content), mimetype="application/octet-stream")
+        packet = PyZip(elements_content)
+
+        return send_file(BytesIO(packet.to_bytes()), mimetype="application/octet-stream")

@@ -25,7 +25,7 @@ global_config.set_local_storage_uri("examples/tmp_folder")
 global_config.set_session_uri("mongodb://localhost:27017/unittests")
 global_config.set_page_size(2)
 from mldatahub.factory.dataset_element_factory import DatasetElementFactory
-from werkzeug.exceptions import Unauthorized, BadRequest, RequestedRangeNotSatisfiable
+from werkzeug.exceptions import Unauthorized, BadRequest, RequestedRangeNotSatisfiable, NotFound
 from mldatahub.config.privileges import Privileges
 import unittest
 from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO, \
@@ -196,6 +196,43 @@ class TestDatasetElementFactory(unittest.TestCase):
         self.assertEqual(len(dataset.elements), 0)
         self.assertEqual(len(dataset2.elements), 0)
 
+    def test_dataset_elements_removal(self):
+        """
+        Factory can remove mutliple elements from datasets at once.
+        """
+        destructor = TokenDAO("normal user privileged with link", 1, 1, "user1",
+                           privileges=Privileges.DESTROY_DATASET + Privileges.DESTROY_ELEMENTS
+                           )
+
+
+        dataset = DatasetDAO("user1/dataset1", "example_dataset", "dataset for testing purposes", "none", tags=["example", "0"])
+
+        self.session.flush()
+
+        destructor = destructor.link_dataset(dataset)
+
+        file_id1 = local_storage.put_file_content(b"content1")
+        file_id2 = local_storage.put_file_content(b"content2")
+
+        element  = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
+        element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
+        element3 = DatasetElementDAO("example3", "none", file_id2, dataset=dataset)
+
+        self.session.flush()
+        dataset = dataset.update()
+
+        self.assertEqual(len(dataset.elements), 3)
+
+        with self.assertRaises(RequestedRangeNotSatisfiable) as ex:
+            DatasetElementFactory(destructor, dataset).destroy_elements([element._id, element2._id, element3._id])
+
+        DatasetElementFactory(destructor, dataset).destroy_elements([element._id, element2._id])
+
+        dataset = dataset.update()
+
+        self.assertEqual(len(dataset.elements), 1)
+        self.assertEqual(dataset.elements[0]._id, element3._id)
+
     def test_dataset_element_edit(self):
         """
         Factory can edit elements from datasets.
@@ -245,7 +282,7 @@ class TestDatasetElementFactory(unittest.TestCase):
             DatasetElementFactory(editor, dataset).edit_element(element3._id, title="asd4")
 
         # editor can not edit elements if they don't exist
-        with self.assertRaises(Unauthorized) as ex:
+        with self.assertRaises(NotFound) as ex:
             DatasetElementFactory(editor, dataset).edit_element("randomID", title="asd5")
 
         # Editor can edit elements if they exist and are inside his dataset
@@ -550,6 +587,51 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         self.assertEqual(contents[element._id], b"content1")
         self.assertEqual(contents[element3._id], b"content2")
+
+
+    def test_dataset_elements_edit(self):
+        """
+        Factory can edit multiple elements from datasets at once.
+        """
+        editor = TokenDAO("normal user privileged with link", 1, 1, "user1",
+                           privileges=Privileges.EDIT_DATASET + Privileges.EDIT_ELEMENTS
+                           )
+
+        dataset = DatasetDAO("user1/dataset1", "example_dataset", "dataset for testing purposes", "none", tags=["example", "0"])
+
+        self.session.flush()
+
+        editor = editor.link_dataset(dataset)
+
+        file_id1 = local_storage.put_file_content(b"content1")
+        file_id2 = local_storage.put_file_content(b"content2")
+
+        element  = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
+        element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
+        element3 = DatasetElementDAO("example3", "none", file_id2, dataset=dataset)
+
+        self.session.flush()
+        dataset = dataset.update()
+
+        self.assertEqual(len(dataset.elements), 3)
+
+        modifications = {
+            element._id: dict(title="asd6", content=b"content4"),
+            element3._id: dict(description="ffff", content=b"New Content!")
+        }
+
+        DatasetElementFactory(editor, dataset).edit_elements(modifications)
+
+        self.session.flush()
+
+        dataset = dataset.update()
+        element = element.update()
+        element3 = element3.update()
+
+        self.assertEqual(element.title, "asd6")
+        self.assertEqual(local_storage.get_file_content(element.file_ref_id), b"content4")
+        self.assertEqual(element3.description, "ffff")
+        self.assertEqual(local_storage.get_file_content(element3.file_ref_id), b"New Content!")
 
     def tearDown(self):
         DatasetDAO.query.remove()

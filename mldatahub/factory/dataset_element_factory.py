@@ -19,9 +19,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
-
 from bson import ObjectId
-
 from flask_restful import abort
 from mldatahub.config.config import global_config
 from mldatahub.config.privileges import Privileges
@@ -97,7 +95,7 @@ class DatasetElementFactory(object):
             abort(401)
 
         if 'file_ref_id' in kwargs and not can_edit_others_elements:
-            abort(401)
+            abort(401, message="File ref ID not allowed.")
 
         if 'content' in kwargs:
             # New content to append here...
@@ -105,15 +103,15 @@ class DatasetElementFactory(object):
             kwargs['file_ref_id'] = file_id
 
         if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_edit_others_elements:
-            abort(401)
+            abort(401, message="Dataset can't be modified.")
 
         dataset_element = DatasetElementDAO.query.get(_id=element_id)
 
         if dataset_element is None:
-            abort(401)
+            abort(404, message="Dataset element wasn't found")
 
         if not self.dataset.has_element(dataset_element) and not can_edit_others_elements:
-            abort(401)
+            abort(401, message="Operation not allowed, element is not contained by the dataset")
 
         for k, v in kwargs.items():
             if k is not None and v is not None:
@@ -122,6 +120,42 @@ class DatasetElementFactory(object):
         self.session.flush()
 
         return dataset_element
+
+    def edit_elements(self, elements_kwargs):
+        can_edit_inner_element = bool(self.token.privileges & Privileges.EDIT_ELEMENTS)
+        can_edit_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
+
+        if not any([can_edit_inner_element, can_edit_others_elements]):
+            abort(401)
+
+        elements_ids = list(elements_kwargs.keys())
+
+        if len(elements_ids) > global_config.get_page_size():
+            abort(416, message="Page size exceeded")
+
+        dataset_elements = DatasetElementDAO.query.find({"dataset_id": self.dataset._id, "_id": { "$in" : elements_ids }})
+
+        for dataset_element in dataset_elements:
+            kwargs = elements_kwargs[dataset_element._id]
+
+            if 'file_ref_id' in kwargs and not can_edit_others_elements:
+                abort(401, message="File ref ID not allowed.")
+
+            if 'content' in kwargs:
+                # New content to append here...
+                file_id = self.local_storage.put_file_content(kwargs['content'])
+                kwargs['file_ref_id'] = file_id
+
+            if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_edit_others_elements:
+                abort(401, message="Dataset can't be modified.")
+
+            for k,v in elements_kwargs[dataset_element._id].items():
+                if k is not None and v is not None:
+                    dataset_element[k] = v
+
+        self.session.flush()
+
+        return dataset_elements
 
     def get_element_info(self, element_id):
         can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
@@ -206,7 +240,7 @@ class DatasetElementFactory(object):
             abort(401)
 
         # Destroy only removes the reference to the file, but not the file itself.
-        # Files are automatically removed by a cron timer that checks for freed files.
+        # Files are automatically removed by the Garbage Collector observer.
 
         dataset_element = DatasetElementDAO.query.get(_id=element_id)
 
@@ -219,6 +253,37 @@ class DatasetElementFactory(object):
         dataset_element.delete()
 
         self.session.flush()
+        self.dataset = self.session.refresh(self.dataset)
+
+        return self.dataset
+
+    def destroy_elements(self, elements_ids):
+        can_destroy_inner_element = bool(self.token.privileges & Privileges.DESTROY_ELEMENTS)
+        can_destroy_others_elements = bool(self.token.privileges & Privileges.ADMIN_DESTROY_TOKEN)
+
+        if not any([can_destroy_inner_element, can_destroy_others_elements]):
+            abort(401)
+
+        if len(elements_ids) > global_config.get_page_size():
+            abort(416, message="Page size exceeded")
+
+        # Destroy only removes the reference to the file, but not the file itself.
+        # Files are automatically removed by the Garbage Collector observer.
+
+        dataset_elements = DatasetElementDAO.query.find({'dataset_id': self.dataset._id, '_id': {'$in': elements_ids}})
+
+        if dataset_elements.count() < len(elements_ids):
+            # Let's find which elements do not exist.
+            retrieved_elements_ids = [element._id for element in dataset_elements]
+            lost_elements = [element_id for element_id in elements_ids if element_id not in retrieved_elements_ids]
+            abort(404, message="The following elements couldn't be deleted (they don't exist?): {}".format(lost_elements))
+
+
+        for d in dataset_elements:
+            d.delete()
+
+        self.session.flush()
+
         self.dataset = self.session.refresh(self.dataset)
 
         return self.dataset
