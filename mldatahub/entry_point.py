@@ -48,6 +48,7 @@ def main():
     api.add_resource(DatasetElements, '/datasets/<token_prefix>/<dataset_prefix>/elements')
     api.add_resource(DatasetElement, '/datasets/<token_prefix>/<dataset_prefix>/elements/<element_id>')
     api.add_resource(DatasetElementContent, '/datasets/<token_prefix>/<dataset_prefix>/elements/<element_id>/content')
+    api.add_resource(DatasetElementContentBundle, '/datasets/<token_prefix>/<dataset_prefix>/elements/content')
     app.run(host="localhost", debug=False, threaded=True)
     garbage_collector.stop()
     global_config.get_local_storage().close()

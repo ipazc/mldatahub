@@ -149,6 +149,18 @@ class DatasetElementFactory(object):
 
         return DatasetElementDAO.query.find(dict(dataset_id=self.dataset._id)).skip(page*global_config.get_page_size()).limit(global_config.get_page_size())
 
+    def get_specific_elements_info(self, elements_id):
+        can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
+        can_view_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
+
+        if not any([can_view_inner_element, can_view_others_elements]):
+            abort(401)
+
+        if len(elements_id) > global_config.get_page_size():
+            abort(416, message="Page size exceeded")
+
+        return DatasetElementDAO.query.find({"dataset_id": self.dataset._id, "_id": { "$in" : elements_id }})
+
     def get_element_thumbnail(self, element_id):
         # The get_element_info() method is going to make all the required checks for the retrieval of the thumbnail.
         dataset_element = self.get_element_info(element_id)
@@ -167,11 +179,24 @@ class DatasetElementFactory(object):
         dataset_element = self.get_element_info(element_id)
 
         if dataset_element.file_ref_id is None:
-            abort(404)
+            abort(404, message="Element could not be found.")
 
         content = self.local_storage.get_file_content(dataset_element.file_ref_id)
 
         return content
+
+    def get_elements_content(self, elements_id):
+        # The get_specific_elements_info() method is going to make all the required checks for the retrieval of the thumbnail.
+        dataset_elements = self.get_specific_elements_info(elements_id)
+
+        if dataset_elements.count() < len(elements_id):
+            # Let's find which elements do not exist.
+            retrieved_elements_ids = [element._id for element in dataset_elements]
+            lost_elements = [element_id for element_id in elements_id if element_id not in retrieved_elements_ids]
+            abort(404, message="The following elements couldn't be retrieved: {}".format(lost_elements))
+
+        contents = {element_id: self.local_storage.get_file_content(element.file_ref_id) for element_id, element in zip(elements_id, dataset_elements)}
+        return contents
 
     def destroy_element(self, element_id):
         can_destroy_inner_element = bool(self.token.privileges & Privileges.DESTROY_ELEMENTS)

@@ -23,8 +23,9 @@
 from mldatahub.config.config import global_config
 global_config.set_local_storage_uri("examples/tmp_folder")
 global_config.set_session_uri("mongodb://localhost:27017/unittests")
+global_config.set_page_size(2)
 from mldatahub.factory.dataset_element_factory import DatasetElementFactory
-from werkzeug.exceptions import Unauthorized, BadRequest
+from werkzeug.exceptions import Unauthorized, BadRequest, RequestedRangeNotSatisfiable
 from mldatahub.config.privileges import Privileges
 import unittest
 from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO, \
@@ -350,7 +351,7 @@ class TestDatasetElementFactory(unittest.TestCase):
         element_watched = DatasetElementFactory(admin, dataset2).get_element_info(element3._id)
         self.assertEqual(element_watched.title, "example3")
 
-    def testDatasetElementCreationLimit(self):
+    def test_dataset_element_creation_limit(self):
         """
         Factory limits creation of dataset's elements depending on the token used to create it.
         """
@@ -371,6 +372,184 @@ class TestDatasetElementFactory(unittest.TestCase):
         with self.assertRaises(Unauthorized) as ex:
             element2 = DatasetElementFactory(creator, dataset).create_element(title="New element2", description="Description unknown",
                                                                tags=["example_tag"], content=b"hello")
+
+    def test_dataset_elements_info_by_pages(self):
+        """
+        Factory can retrieve multiple elements at once by pages.
+        """
+
+        editor = TokenDAO("normal user privileged with link", 1, 1, "user1",
+                          privileges=Privileges.RO_WATCH_DATASET
+                          )
+
+        dataset = DatasetDAO("user1/dataset1", "example_dataset", "dataset for testing purposes", "none",
+                             tags=["example", "0"])
+
+        self.session.flush()
+
+        editor = editor.link_dataset(dataset)
+
+        elements = [DatasetElementDAO("example{}".format(x), "none", "none", dataset=dataset).title for x in range(5)]
+
+        self.session.flush()
+
+        dataset = dataset.update()
+
+        page_size = global_config.get_page_size()
+        for page in range(len(elements) // page_size + int(len(elements) % page_size > 0)):
+            retrieved_elements = DatasetElementFactory(editor, dataset).get_elements_info(page)
+
+            for x in retrieved_elements:
+                self.assertIn(x.title, elements)
+
+    def test_dataset_specific_elements_info(self):
+        """
+        Factory can retrieve multiple elements at once by specific sets.
+        """
+
+        editor = TokenDAO("normal user privileged with link", 1, 1, "user1",
+                          privileges=Privileges.RO_WATCH_DATASET
+                          )
+
+        dataset = DatasetDAO("user1/dataset1", "example_dataset", "dataset for testing purposes", "none",
+                             tags=["example", "0"])
+
+        self.session.flush()
+
+        editor = editor.link_dataset(dataset)
+
+        elements = [DatasetElementDAO("example{}".format(x), "none", "none", dataset=dataset) for x in range(5)]
+        titles = [element.title for element in elements]
+        ids = [element._id for element in elements]
+
+        self.session.flush()
+
+        dataset = dataset.update()
+
+        # Can't retrieve more elements than the page size at once.
+        with self.assertRaises(RequestedRangeNotSatisfiable) as ex:
+            retrieved_elements = [x for x in DatasetElementFactory(editor, dataset).get_specific_elements_info(ids)]
+
+        request1 = ids[0:2]
+        retrieved_elements = [x for x in DatasetElementFactory(editor, dataset).get_specific_elements_info(request1)]
+
+        self.assertEqual(len(retrieved_elements), 2)
+        self.assertIn(retrieved_elements[0].title, titles)
+        self.assertIn(retrieved_elements[1].title, titles)
+
+        request2 = ids[1:3]
+        retrieved_elements2 = [x for x in DatasetElementFactory(editor, dataset).get_specific_elements_info(request2)]
+        self.assertEqual(len(retrieved_elements2), 2)
+        self.assertIn(retrieved_elements2[0].title, titles)
+        self.assertIn(retrieved_elements2[1].title, titles)
+        self.assertNotEqual(retrieved_elements[0].title, retrieved_elements2[0].title)
+        self.assertNotEqual(retrieved_elements[1].title, retrieved_elements2[1].title)
+        self.assertEqual(retrieved_elements[1].title, retrieved_elements2[0].title)
+
+    def test_dataset_element_content_retrieval(self):
+        """
+        Factory can retrieve content of an element.
+        """
+        editor = TokenDAO("normal user privileged with link", 1, 1, "user1",
+                          privileges=Privileges.RO_WATCH_DATASET
+                          )
+        editor2 = TokenDAO("normal user unprivileged", 1, 1, "user1",
+                           privileges=0
+                           )
+        admin = TokenDAO("admin user", 1, 1, "admin",
+                         privileges=Privileges.ADMIN_CREATE_TOKEN + Privileges.ADMIN_EDIT_TOKEN + Privileges.ADMIN_DESTROY_TOKEN)
+
+        dataset = DatasetDAO("user1/dataset1", "example_dataset", "dataset for testing purposes", "none",
+                             tags=["example", "0"])
+        dataset2 = DatasetDAO("user1/dataset2", "example_dataset2", "dataset2 for testing purposes", "none",
+                              tags=["example", "1"])
+
+        self.session.flush()
+
+        editor = editor.link_dataset(dataset)
+        editor2 = editor2.link_dataset(dataset2)
+
+        file_id1 = local_storage.put_file_content(b"content1")
+        file_id2 = local_storage.put_file_content(b"content2")
+
+        element = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
+        element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
+        element3 = DatasetElementDAO("example3", "none", file_id2, dataset=dataset2)
+
+        self.session.flush()
+        dataset = dataset.update()
+        dataset2 = dataset2.update()
+
+        self.assertEqual(len(dataset.elements), 2)
+        self.assertEqual(len(dataset2.elements), 1)
+
+        # editor can see elements from his dataset
+        element_content = DatasetElementFactory(editor, dataset).get_element_content(element._id)
+        self.assertEqual(element_content, b"content1")
+
+        # editor can not see elements from other's datasets
+        with self.assertRaises(Unauthorized) as ex:
+            element_content = DatasetElementFactory(editor, dataset2).get_element_content(element3._id)
+
+        # editor can not see external elements within his dataset
+        with self.assertRaises(Unauthorized) as ex:
+            element_content = DatasetElementFactory(editor, dataset).get_element_content(element3._id)
+
+        # editor2 is not privileged and can not see any elements of his own dataset
+        with self.assertRaises(Unauthorized) as ex:
+            element_content = DatasetElementFactory(editor2, dataset2).get_element_content(element3._id)
+
+        # Or external elements
+        with self.assertRaises(Unauthorized) as ex:
+            element_content = DatasetElementFactory(editor2, dataset2).get_element_content(element2._id)
+
+        # Or other datasets
+        with self.assertRaises(Unauthorized) as ex:
+            element_content = DatasetElementFactory(editor2, dataset).get_element_content(element2._id)
+
+        # Admin can do anything
+        element_content = DatasetElementFactory(admin, dataset).get_element_content(element._id)
+        self.assertEqual(element_content, b"content1")
+
+        # But not this: dataset2 does not have element
+        with self.assertRaises(Unauthorized) as ex:
+            element_content = DatasetElementFactory(admin, dataset2).get_element_content(element._id)
+
+        element_content = DatasetElementFactory(admin, dataset2).get_element_content(element3._id)
+        self.assertEqual(element_content, b"content2")
+
+    def test_dataset_multiple_elements_content_retrieval(self):
+        """
+        Factory can retrieve content of multiple elements at once.
+        """
+        editor = TokenDAO("normal user privileged with link", 1, 1, "user1",
+                          privileges=Privileges.RO_WATCH_DATASET
+                          )
+
+        dataset = DatasetDAO("user1/dataset1", "example_dataset", "dataset for testing purposes", "none",
+                             tags=["example", "0"])
+
+        self.session.flush()
+
+        editor = editor.link_dataset(dataset)
+
+        file_id1 = local_storage.put_file_content(b"content1")
+        file_id2 = local_storage.put_file_content(b"content2")
+
+        element = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
+        element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
+        element3 = DatasetElementDAO("example3", "none", file_id2, dataset=dataset)
+
+        self.session.flush()
+        dataset = dataset.update()
+
+        with self.assertRaises(RequestedRangeNotSatisfiable) as ex:
+            contents = DatasetElementFactory(editor, dataset).get_elements_content([element._id, element2._id, element3._id])
+
+        contents = DatasetElementFactory(editor, dataset).get_elements_content([element._id, element3._id])
+
+        self.assertEqual(contents[element._id], b"content1")
+        self.assertEqual(contents[element3._id], b"content2")
 
     def tearDown(self):
         DatasetDAO.query.remove()

@@ -268,3 +268,50 @@ class DatasetElementContent(TokenizedResource):
         DatasetElementFactory(token, dataset).edit_element(ObjectId(element_id), content=content)
 
         return "Done", 200
+
+
+class DatasetElementContentBundle(TokenizedResource):
+
+    def __init__(self):
+        super().__init__()
+        self.session = global_config.get_session()
+        self.get_parser = reqparse.RequestParser()
+
+        arguments = {
+            "ids":
+                {
+                    "type": list,
+                    "required": True,
+                    "help": "List of element ids to retrieve content from (limited to {}).".format(global_config.get_page_size()),
+                    "location": "json"
+                },
+        }
+
+        for argument, kwargs in arguments.items():
+            self.get_parser.add_argument(argument, **kwargs)
+
+    @control_access()
+    def get(self, token_prefix, dataset_prefix):
+        required_privileges = [
+            Privileges.RO_WATCH_DATASET,
+            Privileges.ADMIN_EDIT_TOKEN
+        ]
+
+        _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
+        full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
+
+        kwargs = self.get_parser.parse_args()
+
+        if "ids" in request.json:
+            kwargs['ids'] = request.json['ids']  # fast fix for split-bug of the tags.
+
+        ids = kwargs['ids']
+        if len(ids) > global_config.get_page_size():
+            abort(416, message="")
+
+
+        dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
+
+        content = DatasetElementFactory(token, dataset).get_element_content(ObjectId(element_id))
+
+        return send_file(BytesIO(content), mimetype="application/octet-stream")
