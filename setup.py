@@ -23,6 +23,7 @@
 
 import sys
 from setuptools import setup, setuptools
+from mldatahub import __version__
 
 __author__ = 'Iván de Paz Centeno'
 
@@ -35,7 +36,7 @@ if sys.version_info < (3, 4, 1):
     sys.exit('Python < 3.4.1 is not supported!')
 
 setup(name='mldatahub',
-      version='0.0.1',
+      version=__version__,
       description='REST API hub for storing ML datasets.',
       long_description=readme(),
       url='http://github.com/ipazc/mldatahub',
@@ -49,9 +50,27 @@ setup(name='mldatahub',
           "flask_restful",
           "ming"
       ],
+      classifiers=[
+          'Development Status :: 1 - Planning',
+          'Environment :: Console',
+          'Intended Audience :: Developers',
+          'Intended Audience :: Education',
+          'Intended Audience :: Science/Research',
+          'Natural Language :: English',
+          'Operating System :: POSIX :: Linux',
+          'Programming Language :: Python :: 3.4',
+          'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: 3.7',
+          'Framework :: Flask',
+          'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)'
+      ],
       entry_points = {
           'console_scripts': ['mldatahub=mldatahub.entry_point:main'],
       },
+      data_files = [
+          ('/etc/mldatahub', ['config.json'])
+      ],
       test_suite='nose.collector',
       tests_require=['nose'],
       include_package_data=True,

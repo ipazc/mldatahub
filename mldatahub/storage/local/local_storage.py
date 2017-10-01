@@ -45,7 +45,7 @@ class LocalStorage(GenericStorage):
 
         # Initializing...
         try:
-            with open("file_list.json") as f:
+            with open(global_config.get_storage_cache_file()) as f:
                 files_descr = json.load(f)
         except FileNotFoundError as ex:
             files_descr = {'closed': False, 'files': []}
@@ -54,7 +54,7 @@ class LocalStorage(GenericStorage):
             print("Storage wasn't closed gracefully. It must be reloaded and it may take several minutes...")
             files_descr = {'closed': True, 'files': os.listdir(root_key)}
 
-        with open("file_list.json", "w") as f:
+        with open(global_config.get_storage_cache_file(), "w") as f:
             json.dump(files_descr, f, indent=4)
 
         self.files_list = set(files_descr['files'])
@@ -63,7 +63,7 @@ class LocalStorage(GenericStorage):
 
     def _save_file_list(self, closed=False):
         files_descr = {'closed': closed, 'files': list(self.files_list)}
-        with open("file_list.json", "w") as f:
+        with open(global_config.get_storage_cache_file(), "w") as f:
             json.dump(files_descr, f, indent=4)
         self.last_saved_check = now()
 

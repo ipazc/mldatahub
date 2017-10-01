@@ -1,0 +1,10 @@
+{
+  "session_uri": "mongodb://localhost:27017/mlhubdata",
+  "local_storage_uri": "$HOME/storage",
+  "storage_cache_file": "$HOME/file_list.json",
+  "max_access_times": "250",
+  "access_reset_time": "1",
+  "page_size": "100",
+  "save_interval": "180",
+  "garbage_collector_time_interval": "600"
+}

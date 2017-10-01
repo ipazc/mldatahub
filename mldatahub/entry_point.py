@@ -34,9 +34,6 @@ __author__ = "Iván de Paz Centeno"
 
 def main():
 
-    if __name__ != '__main__':
-        exit(-1)
-
     app = Flask(__name__)
     api = Api(app)
 
@@ -54,3 +51,7 @@ def main():
     app.run(host="localhost", debug=False, threaded=True)
     garbage_collector.stop()
     global_config.get_local_storage().close()
+
+if __name__ == '__main__':
+    main()
+    print("Exiting application... (it may take a few seconds to clean up everything)")

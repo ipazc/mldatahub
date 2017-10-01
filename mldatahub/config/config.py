@@ -19,7 +19,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
-
+import json
+import os
+from pathlib import Path
 from dateutil.relativedelta import relativedelta
 from ming import create_datastore
 from ming.odm import ThreadLocalODMSession
@@ -27,6 +29,7 @@ import datetime
 
 __author__ = 'Iván de Paz Centeno'
 
+HOME = str(Path.home())
 
 
 def now():
@@ -46,13 +49,30 @@ class GlobalConfig(object):
         self.session = None
         self.local_storage = None
 
-    #def from_file(self):
+        self.load_from_file()
+
+    def load_from_file(self):
+        try:
+            with open("/etc/mldatahub/config.json") as f:
+                self.config_values = json.load(f)
+
+                self.config_values['local_storage_uri'] = self.config_values['local_storage_uri'].replace("$HOME", HOME)
+                self.config_values['storage_cache_file'] = self.config_values['storage_cache_file'].replace("$HOME", HOME)
+
+            print("Config read:")
+            for k, v in self.config_values.items():
+                print("{}: {}".format(k, v))
+        except FileNotFoundError as ex:
+            print("Config file not found. Running on default values.")
 
     def set_session_uri(self, new_uri):
         self.config_values['session_uri'] = new_uri
 
     def set_local_storage_uri(self, new_uri):
         self.config_values['local_storage_uri'] = new_uri
+
+    def set_storage_cache_file(self, new_storage_filename):
+        self.config_values['storage_cache_file'] = new_storage_filename
 
     def set_page_size(self, new_page_size):
         self.config_values['page_size'] = new_page_size
@@ -63,8 +83,14 @@ class GlobalConfig(object):
     def set_garbage_collector_timer_interval(self, new_interval):
         self.config_values['garbage_collector_time_interval'] = new_interval
 
+    def set_max_access_times(self, new_max_access_times):
+        self.config_values['new_max_access_times'] = new_max_access_times
+
+    def set_access_reset_time(self, new_access_reset_time):
+        self.config_values['access_reset_time'] = new_access_reset_time
+
     def get_session(self):
-        if 'uri' not in self.config_values:
+        if 'session_uri' not in self.config_values:
             global_config.set_session_uri("mongodb://localhost:27017/mlhubdata")
 
         if self.session is None:
@@ -72,13 +98,19 @@ class GlobalConfig(object):
         return self.session
 
     def get_local_storage(self):
+
         if 'local_storage_uri' not in self.config_values:
-            self.config_values['local_storage_uri'] = 'storage'
+            self.config_values['local_storage_uri'] = os.path.join(HOME, 'storage')
 
         if self.local_storage is None:
             from mldatahub.storage.local.local_storage import LocalStorage
             self.local_storage = LocalStorage(self.config_values['local_storage_uri'])
         return self.local_storage
+
+    def get_storage_cache_file(self):
+        if 'storage_cache_file' not in self.config_values:
+            self.config_values['storage_cache_file'] = os.path.join(HOME, 'file_list.json')
+        return self.config_values['storage_cache_file']
 
     def get_max_access_times(self):
         if 'max_access_times' not in self.config_values:
