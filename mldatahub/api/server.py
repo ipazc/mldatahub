@@ -24,12 +24,12 @@ __author__ = "Iván de Paz Centeno"
 
 
 from flask import request
-from flask_restful import reqparse
 from mldatahub.api.tokenized_resource import TokenizedResource, control_access
 from mldatahub.config.config import global_config, now
 from mldatahub.config.privileges import Privileges
 from mldatahub.factory.dataset_factory import DatasetFactory
 from mldatahub.factory.token_factory import TokenFactory
+import pkg_resources
 
 
 class Server(TokenizedResource):
@@ -50,7 +50,12 @@ class Server(TokenizedResource):
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
 
-        return {''}
+        response = {
+            'Server': 'mldatahub {}'.format(pkg_resources.require("mldatahub")[0].version),
+            'Page-Size': global_config.get_page_size()
+        }
+
+        return response
 
     @control_access()
     def post(self):

@@ -27,11 +27,6 @@ from setuptools import setup, setuptools
 __author__ = 'Iván de Paz Centeno'
 
 
-def version():
-    with open("version.py") as f:
-        _version = f.readline().split("version=")[1]
-    return _version
-
 def readme():
     with open('README.rst') as f:
         return f.read()
@@ -54,6 +49,9 @@ setup(name='mldatahub',
           "flask_restful",
           "ming"
       ],
+      entry_points = {
+          'console_scripts': ['mldatahub=mldatahub.entry_point:main'],
+      },
       test_suite='nose.collector',
       tests_require=['nose'],
       include_package_data=True,

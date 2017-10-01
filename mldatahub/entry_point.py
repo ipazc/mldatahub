@@ -1,10 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#
+# MLDataHub
+# Copyright (C) 2017 Iván de Paz Centeno <ipazc@unileon.es>.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; version 3
+# of the License or (at your option) any later version of
+# the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+# MA  02110-1301, USA.
 
 from flask import Flask
 from flask_restful import Api
 from mldatahub.api.dataset import Datasets, Dataset, DatasetForker
 from mldatahub.api.dataset_element import DatasetElements, DatasetElement, DatasetElementContent
+from mldatahub.api.server import Server
 from mldatahub.api.token import Tokens, Token, TokenLinker
 from mldatahub.config.config import global_config
 from mldatahub.observer.garbage_collector import GarbageCollector
@@ -12,12 +32,16 @@ from mldatahub.observer.garbage_collector import GarbageCollector
 __author__ = "Iván de Paz Centeno"
 
 
-app = Flask(__name__)
-api = Api(app)
+def main():
 
+    if __name__ != '__main__':
+        exit(-1)
 
-if __name__ == '__main__':
+    app = Flask(__name__)
+    api = Api(app)
+
     garbage_collector = GarbageCollector()
+    api.add_resource(Server, '/server')
     api.add_resource(Tokens, '/tokens')
     api.add_resource(Token, '/tokens/<token_id>')
     api.add_resource(TokenLinker, '/tokens/<token_id>/link/<token_prefix>/<dataset_prefix>')
