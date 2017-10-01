@@ -21,7 +21,6 @@
 # MA  02110-1301, USA.
 import json
 import os
-from pathlib import Path
 from dateutil.relativedelta import relativedelta
 from ming import create_datastore
 from ming.odm import ThreadLocalODMSession
@@ -29,7 +28,7 @@ import datetime
 
 __author__ = 'Iván de Paz Centeno'
 
-HOME = str(Path.home())
+HOME = os.path.expanduser("~")
 
 
 def now():
