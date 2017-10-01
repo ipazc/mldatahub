@@ -69,7 +69,7 @@ setup(name='mldatahub',
           'console_scripts': ['mldatahub=mldatahub.entry_point:main'],
       },
       data_files = [
-          ('/etc/mldatahub', ['config.json'])
+          ('/etc/mldatahub', ['mldatahub/config.json'])
       ],
       test_suite='nose.collector',
       tests_require=['nose'],
