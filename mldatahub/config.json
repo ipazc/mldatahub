@@ -1,10 +1,25 @@
 {
+  "#1":"session_uri allows to select which DB backend should be used.",
   "session_uri": "mongodb://localhost:27017/mldatahub",
+
+  "#2":"The local storage where the files are going to be stored.",
   "local_storage_uri": "$HOME/storage",
+
+  "#3":"The location of the local-storage cache file.",
   "storage_cache_file": "$HOME/file_list.json",
+
+  "#4":"Max number of accesses to allow in less than 'access_reset_time' seconds before blocking the connection.",
   "max_access_times": 250,
+
+  "#5":"Time window in seconds to for the 'max_access_times'.",
   "access_reset_time": 1,
+
+  "#6":"Max number of dataset's elements retrieved within a single request.",
   "page_size": 100,
+
+  "#7":"Time interval in seconds between the save of the storage file cache into disk.",
   "save_interval": 180,
+
+  "#8":"Time interval in seconds between Garbage Collector collecting unreferenced elements.",
   "garbage_collector_time_interval": 600
 }

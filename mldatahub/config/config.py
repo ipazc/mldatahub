@@ -60,7 +60,8 @@ class GlobalConfig(object):
 
             print("Config read:")
             for k, v in self.config_values.items():
-                print("{}: {}".format(k, v))
+                if not k.startswith("#"):
+                    print("{}: {}".format(k, v))
         except FileNotFoundError as ex:
             print("Config file not found. Running on default values.")
 
