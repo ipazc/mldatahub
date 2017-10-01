@@ -17,6 +17,6 @@ services:
 before_script:
   - sleep 15
 script:
-  - python3 setup.py nosetests --with-coverage --cover-package pyzip --verbosity=2
+  - python3 setup.py nosetests --with-coverage --cover-package mldatahub --verbosity=2
 after_success:
   - coveralls
