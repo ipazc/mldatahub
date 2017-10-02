@@ -226,8 +226,10 @@ class TestDatasetFactory(unittest.TestCase):
 
         self.assertEqual(len(forked_dataset.elements), 2)
 
-        self.assertEqual(forked_dataset.elements[0].title, element1.title)
-        self.assertEqual(forked_dataset.elements[1].title, element2.title)
+        elements_titles = [element1.title, element2.title]
+
+        self.assertIn(forked_dataset.elements[0].title, elements_titles)
+        self.assertIn(forked_dataset.elements[1].title, elements_titles)
 
         # viewer can NOT clone it from creator.
         with self.assertRaises(Unauthorized) as ex:
