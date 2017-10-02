@@ -56,7 +56,7 @@ class DatasetDAO(MappedClass):
     forked_from = RelationProperty('DatasetDAO')
 
     def __init__(self, url_prefix, title, description, reference, tags=None, creation_date=now(), modification_date=now(),
-                 forked_count=0, forked_from_dataset=None, forked_from_dataset_id=None):
+                 fork_count=0, forked_from=None, forked_from_id=None):
         with lock:
             previous_dset = DatasetDAO.query.get(url_prefix=url_prefix)
             if previous_dset is not None or url_prefix in taken_url_prefixes:
@@ -64,8 +64,8 @@ class DatasetDAO(MappedClass):
             else:
                 taken_url_prefixes[url_prefix] = 1
 
-        if forked_from_dataset_id is None and forked_from_dataset is not None:
-            forked_from_dataset_id = forked_from_dataset._id
+        if forked_from_id is None and forked_from is not None:
+            forked_from_id = forked_from._id
 
         kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__"]}
         super().__init__(**kwargs)

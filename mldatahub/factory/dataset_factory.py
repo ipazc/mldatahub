@@ -56,6 +56,15 @@ class DatasetFactory(object):
             url_prefix = ""
             abort(400)
 
+        # Limit arguments.
+        kwargs['fork_count'] = 0
+
+        if 'forked_from' in kwargs:
+            del kwargs['forked_from']
+
+        if 'forked_from_id' in kwargs:
+            del kwargs['forked_from_id']
+
         if can_create_others_dataset:
             illegal_chars = illegal_chars[1:] # "/" is allowed for admin
 
@@ -76,6 +85,27 @@ class DatasetFactory(object):
         self.session.flush()
 
         return dataset
+
+    def fork_dataset(self, dataset_url_prefix, token_src, *args, **kwargs) -> DatasetDAO:
+        source_factory = DatasetFactory(token_src)
+
+        target_dataset = source_factory.get_dataset(dataset_url_prefix)
+
+        if target_dataset is None:
+            abort(404, message="Dataset wasn't found.")
+
+        fork_dataset = self.create_dataset(*args, **kwargs)
+
+        target_dataset.fork_count += 1
+        fork_dataset.forked_from = target_dataset
+
+        # Now we clone all the elements.
+        for element in target_dataset.elements:
+            fork_dataset.add_element(element.title, element.description, element.file_ref_id, element.http_ref, list(element.tags))
+
+        self.session.flush()
+
+        return fork_dataset
 
     def _dataset_limit_reached(self) -> bool:
         return len(self.token.datasets) >= self.token.max_dataset_count
@@ -121,7 +151,7 @@ class DatasetFactory(object):
                 abort(401, message="Dataset can't be accessed.")
 
             # Fix: this token can only edit a dataset if the dataset is linked to it.
-            if edit_dataset not in self.token.datasets:
+            if not self.token.has_dataset(edit_dataset):
                 abort(401, message="Dataset can't be accessed.")
 
         kwargs['modification_date'] = now()

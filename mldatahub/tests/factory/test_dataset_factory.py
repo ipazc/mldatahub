@@ -190,6 +190,52 @@ class TestDatasetFactory(unittest.TestCase):
         dataset = DatasetDAO.query.get(url_prefix="user2/creator")
         self.assertIsNone(dataset, None)
 
+    def test_dataset_fork(self):
+        """
+        Factory can fork a dataset
+        :return:
+        """
+        viewer = TokenDAO("normal user only view dataset", 2, 10, "viewer", privileges=Privileges.RO_WATCH_DATASET)
+        creator = TokenDAO("normal user privileged", 2, 10, "creator", privileges=Privileges.CREATE_DATASET)
+
+        d = DatasetDAO("viewer/dataset", "dataset", "description for dataset", "none", ["d1", "d2"])
+
+        self.session.flush()
+
+        element1 = DatasetElementDAO("a", "a", "nonea", "noneaa", ["taga"], dataset=d)
+        element2 = DatasetElementDAO("b", "b", "noneb", "nonebb", ["tagb"], dataset=d)
+
+        self.session.flush()
+
+        d = d.update()
+
+        self.assertEqual(len(d.elements), 2)
+
+        viewer = viewer.link_dataset(d)
+        d.update()
+
+        # Creator can clone it from viewer.
+        forked_dataset = DatasetFactory(creator).fork_dataset(d.url_prefix, viewer, title="dataset_cloned",
+                                             url_prefix="dataset", description="desc", reference="none",
+                                             tags=["d2", "d1"])
+
+        self.assertEqual(forked_dataset.url_prefix, "creator/dataset")
+        self.assertEqual(forked_dataset.title, "dataset_cloned")
+        self.assertEqual(forked_dataset.description, "desc")
+        self.assertEqual(forked_dataset.tags, ["d2", "d1"])
+
+        self.assertEqual(len(forked_dataset.elements), 2)
+
+        self.assertEqual(forked_dataset.elements[0].title, element1.title)
+        self.assertEqual(forked_dataset.elements[1].title, element2.title)
+
+        # viewer can NOT clone it from creator.
+        with self.assertRaises(Unauthorized) as ex:
+            forked_dataset = DatasetFactory(viewer).fork_dataset(forked_dataset.url_prefix, creator, title="dataset_cloned",
+                                                 url_prefix="dataset", description="desc", reference="none",
+                                                 tags=["d2", "d1"])
+
+
     def test_dataset_retrieval(self):
         """
         Factory can retrieve datasets.
