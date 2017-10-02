@@ -158,40 +158,6 @@ class DatasetElementsBundle(TokenizedResource):
 
         self.session = global_config.get_session()
 
-        arguments = {
-            "title":
-                {
-                    "type": str,
-                    "required": True,
-                    "help": "Title for the dataset.",
-                    "location": "json"
-                },
-            "description":
-                {
-                    "type": str,
-                    "required": True,
-                    "help": "Description for the dataset.",
-                    "location": "json"
-                },
-            "http_ref":
-                {
-                    "type": str,
-                    "required": False,
-                    "help": "Reference data (perhaps a Bibtex in string format?)",
-                    "location": "json"
-                },
-            "tags":
-                {
-                    "type": list,
-                    "required": False,
-                    "help": "Tags for the dataset (ease the searches for this dataset).",
-                    "location": "json"
-                },
-        }
-
-        for argument, kwargs in arguments.items():
-            self.post_parser.add_argument(argument, **kwargs)
-
     @control_access()
     def get(self, token_prefix, dataset_prefix):
         """
@@ -431,7 +397,7 @@ class DatasetElementContentBundle(TokenizedResource):
         self.get_parser = reqparse.RequestParser()
 
         arguments = {
-            "ids":
+            "elements":
                 {
                     "type": list,
                     "required": True,
@@ -449,7 +415,6 @@ class DatasetElementContentBundle(TokenizedResource):
             Privileges.RO_WATCH_DATASET,
             Privileges.ADMIN_EDIT_TOKEN
         ]
-
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
         full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 

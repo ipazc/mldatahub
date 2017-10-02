@@ -298,7 +298,7 @@ class DatasetElementFactory(object):
         if len(elements_id) > global_config.get_page_size():
             abort(416, message="Page size exceeded")
 
-        return DatasetElementDAO.query.find({"dataset_id": self.dataset._id, "_id": { "$in" : elements_id }})
+        return DatasetElementDAO.query.find({"dataset_id": self.dataset._id, "_id": {"$in": elements_id }})
 
     def get_element_thumbnail(self, element_id:ObjectId) -> bytes:
         # The get_element_info() method is going to make all the required checks for the retrieval of the thumbnail.
@@ -334,7 +334,7 @@ class DatasetElementFactory(object):
             lost_elements = [element_id for element_id in elements_id if element_id not in retrieved_elements_ids]
             abort(404, message="The following elements couldn't be retrieved: {}".format(lost_elements))
 
-        contents = {element_id: self.local_storage.get_file_content(element.file_ref_id) for element_id, element in zip(elements_id, dataset_elements)}
+        contents = {element._id: self.local_storage.get_file_content(element.file_ref_id) for element in dataset_elements}
         return contents
 
     def destroy_element(self, element_id:ObjectId) -> DatasetDAO:

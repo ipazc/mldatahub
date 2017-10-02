@@ -87,10 +87,12 @@ class LocalStorage(GenericStorage):
         return id
 
     def get_file_content(self, file_id):
+        try:
+            with open(os.path.join(self.root_key, file_id), "rb") as f:
+                content_bytes = f.read()
+        except FileNotFoundError as ex:
+            content_bytes = b""
 
-        with open(os.path.join(self.root_key, file_id), "rb") as f:
-            content_bytes = f.read()
-        
         return content_bytes
 
     def delete_file_content(self, file_id):
