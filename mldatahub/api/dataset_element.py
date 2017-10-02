@@ -23,7 +23,7 @@
 from io import BytesIO
 from bson import ObjectId
 from flask import send_file, request
-from flask_restful import reqparse
+from flask_restful import reqparse, abort
 from pyzip import PyZip
 
 from mldatahub.api.tokenized_resource import TokenizedResource, control_access
@@ -41,6 +41,9 @@ class DatasetElements(TokenizedResource):
         super().__init__()
         self.get_parser = reqparse.RequestParser()
         self.get_parser.add_argument("page", type=int, required=False, help="Page number to retrieve.", default=0)
+        self.get_parser.add_argument("elements", type=list, required=False, location="json", help="List of IDs to retrieve. Overrides the page attribute")
+        self.get_parser.add_argument("options", type=dict, required=False, location="json", help="options string")
+
         self.post_parser = reqparse.RequestParser()
         self.session = global_config.get_session()
 
@@ -82,7 +85,10 @@ class DatasetElements(TokenizedResource):
     def get(self, token_prefix, dataset_prefix):
         """
         Retrieves dataset elements from a given dataset.
-        Accepts a parameter: page. It will strip the results to 20 elements per page.
+        Accepts parameters:
+            page. It will strip the results to `global_config.get_page_size()` elements per page.
+            elements. It will retrieve the info from the specified array of elements IDs rather than the page.
+            options. result's find options.
         :return:
         """
         required_privileges = [
@@ -99,7 +105,12 @@ class DatasetElements(TokenizedResource):
 
         page = args['page']
 
-        elements_info = DatasetElementFactory(token, dataset).get_elements_info(page)
+        if 'options' in request.json:
+            options = request.json['options']
+        else:
+            options = None
+
+        elements_info = DatasetElementFactory(token, dataset).get_elements_info(page, options=options)
 
         return [element.serialize() for element in elements_info]
 
@@ -134,6 +145,146 @@ class DatasetElements(TokenizedResource):
 
         return str(element._id), 201
 
+
+class DatasetElementsBundle(TokenizedResource):
+
+    def __init__(self):
+        super().__init__()
+        self.get_parser = reqparse.RequestParser()
+        self.get_parser.add_argument("elements", type=list, required=True, location="json", help="List of IDs to retrieve.")
+        self.post_parser = self.get_parser
+        self.patch_parser = self.get_parser
+        self.delete_parser = self.get_parser
+
+        self.session = global_config.get_session()
+
+        arguments = {
+            "title":
+                {
+                    "type": str,
+                    "required": True,
+                    "help": "Title for the dataset.",
+                    "location": "json"
+                },
+            "description":
+                {
+                    "type": str,
+                    "required": True,
+                    "help": "Description for the dataset.",
+                    "location": "json"
+                },
+            "http_ref":
+                {
+                    "type": str,
+                    "required": False,
+                    "help": "Reference data (perhaps a Bibtex in string format?)",
+                    "location": "json"
+                },
+            "tags":
+                {
+                    "type": list,
+                    "required": False,
+                    "help": "Tags for the dataset (ease the searches for this dataset).",
+                    "location": "json"
+                },
+        }
+
+        for argument, kwargs in arguments.items():
+            self.post_parser.add_argument(argument, **kwargs)
+
+    @control_access()
+    def get(self, token_prefix, dataset_prefix):
+        """
+        Retrieves specific dataset elements from a given dataset.
+        Accepts parameters:
+            elements. It will retrieve the info from the specified array of elements IDs.
+        :return:
+        """
+        required_privileges = [
+            Privileges.RO_WATCH_DATASET,
+            Privileges.ADMIN_EDIT_TOKEN
+        ]
+
+        _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
+        args = self.get_parser.parse_args()
+
+        full_prefix = "{}/{}".format(token_prefix, dataset_prefix)
+
+        dataset = DatasetFactory(token).get_dataset(full_prefix)
+
+        # That json value is required, it is validated by the get_parser; so, it is ensured that key exists in the dict.
+        elements_ids = request.json['elements']
+
+        elements_info = DatasetElementFactory(token, dataset).get_specific_elements_info([ObjectId(x) for x in elements_ids])
+
+        return [element.serialize() for element in elements_info]
+
+    @control_access()
+    def delete(self, token_prefix, dataset_prefix):
+        """
+        """
+        required_privileges = [
+            Privileges.DESTROY_ELEMENTS,
+            Privileges.ADMIN_EDIT_TOKEN
+        ]
+
+        _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
+        args = self.delete_parser.parse_args()
+
+        full_prefix = "{}/{}".format(token_prefix, dataset_prefix)
+
+        dataset = DatasetFactory(token).get_dataset(full_prefix)
+
+        # That json value is required, it is validated by the get_parser; so, it is ensured that key exists in the dict.
+        elements_ids = request.json['elements']
+
+        DatasetElementFactory(token, dataset).destroy_elements([ObjectId(x) for x in elements_ids])
+
+        return 200, "Done."
+
+    @control_access()
+    def post(self, token_prefix, dataset_prefix):
+
+        required_privileges = [
+            Privileges.ADD_ELEMENTS,
+            Privileges.ADMIN_EDIT_TOKEN
+        ]
+
+        _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
+        args = self.post_parser.parse_args()
+
+        full_prefix = "{}/{}".format(token_prefix, dataset_prefix)
+
+        dataset = DatasetFactory(token).get_dataset(full_prefix)
+
+        # That json value is required, it is validated by the post_parser; so, it is ensured that key exists in the dict.
+        elements_kwargs = request.json['elements']
+
+        elements_created = DatasetElementFactory(token, dataset).create_elements(elements_kwargs)
+
+        return [element.serialize() for element in elements_created]
+
+    @control_access()
+    def patch(self, token_prefix, dataset_prefix):
+
+        required_privileges = [
+            Privileges.EDIT_ELEMENTS,
+            Privileges.ADMIN_EDIT_TOKEN
+        ]
+
+        _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
+        args = self.post_parser.parse_args()
+
+        full_prefix = "{}/{}".format(token_prefix, dataset_prefix)
+
+        dataset = DatasetFactory(token).get_dataset(full_prefix)
+
+        # That json value is required, it is validated by the delete_parser; so, it is ensured that key exists in the dict.
+        elements_kwargs = request.json['elements']
+
+        edited_elements = DatasetElementFactory(token, dataset).edit_elements(elements_kwargs)
+
+        return [element.serialize() for element in edited_elements]
 
 class DatasetElement(TokenizedResource):
 
@@ -304,15 +455,35 @@ class DatasetElementContentBundle(TokenizedResource):
 
         kwargs = self.get_parser.parse_args()
 
-        if "ids" in request.json:
-            kwargs['ids'] = request.json['ids']  # fast fix for split-bug of the tags.
+        if 'elements' in request.json:
+            kwargs['elements'] = request.json['elements']  # fast fix for split-bug of the tags.
 
-        ids = kwargs['ids']
+        elements = kwargs['elements']
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
-        elements_content = DatasetElementFactory(token, dataset).get_elements_content([ObjectId(id) for id in ids])
+        elements_content = DatasetElementFactory(token, dataset).get_elements_content([ObjectId(id) for id in elements])
 
         packet = PyZip(elements_content)
 
         return send_file(BytesIO(packet.to_bytes()), mimetype="application/octet-stream")
+
+    @control_access()
+    def put(self, token_prefix, dataset_prefix):
+        required_privileges = [
+            Privileges.EDIT_ELEMENTS,
+            Privileges.ADMIN_EDIT_TOKEN
+        ]
+
+        _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
+        full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
+
+        content = request.stream.read()
+        packet = PyZip.from_bytes(content)
+
+        dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
+
+        crafted_request = {ObjectId(k): {'content': v} for k, v in packet.items()}
+        DatasetElementFactory(token, dataset).edit_elements(crafted_request)
+
+        return "Done", 200

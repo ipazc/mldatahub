@@ -64,6 +64,11 @@ class GlobalConfig(object):
                     print("{}: {}".format(k, v))
         except FileNotFoundError as ex:
             print("Config file not found. Running on default values.")
+    def set_host(self, new_host):
+        self.config_values['host'] = new_host
+
+    def set_port(self, new_port):
+        self.config_values['port'] = new_port
 
     def set_session_uri(self, new_uri):
         self.config_values['session_uri'] = new_uri
@@ -89,9 +94,21 @@ class GlobalConfig(object):
     def set_access_reset_time(self, new_access_reset_time):
         self.config_values['access_reset_time'] = new_access_reset_time
 
+    def get_host(self):
+        if 'host' not in self.config_values:
+            self.set_host("localhost")
+
+        return self.config_values['host']
+
+    def get_port(self):
+        if 'port' not in self.config_values:
+            self.set_port("5555")
+
+        return int(self.config_values['port'])
+
     def get_session(self):
         if 'session_uri' not in self.config_values:
-            global_config.set_session_uri("mongodb://localhost:27017/mlhubdata")
+            self.set_session_uri("mongodb://localhost:27017/mlhubdata")
 
         if self.session is None:
             self.session = ThreadLocalODMSession(bind=create_datastore(self.config_values['session_uri']))

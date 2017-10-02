@@ -21,5 +21,11 @@
   "save_interval": 180,
 
   "#8":"Time interval in seconds between Garbage Collector collecting unreferenced elements.",
-  "garbage_collector_time_interval": 600
+  "garbage_collector_time_interval": 600,
+
+  "#9":"Listen host",
+  "host": "localhost",
+
+  "#10":"Listen port",
+  "port": "5555"
 }

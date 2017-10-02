@@ -23,7 +23,8 @@
 from flask import Flask
 from flask_restful import Api
 from mldatahub.api.dataset import Datasets, Dataset, DatasetForker
-from mldatahub.api.dataset_element import DatasetElements, DatasetElement, DatasetElementContent
+from mldatahub.api.dataset_element import DatasetElements, DatasetElement, DatasetElementContent, DatasetElementsBundle, \
+    DatasetElementContentBundle
 from mldatahub.api.server import Server
 from mldatahub.api.token import Tokens, Token, TokenLinker
 from mldatahub.config.config import global_config
@@ -44,12 +45,13 @@ def main():
     api.add_resource(TokenLinker, '/tokens/<token_id>/link/<token_prefix>/<dataset_prefix>')
     api.add_resource(Datasets, '/datasets')
     api.add_resource(Dataset, '/datasets/<token_prefix>/<dataset_prefix>')
-    api.add_resource(DatasetForker, '/datasets/<token_prefix>/<dataset_prefix>/fork')
+    api.add_resource(DatasetForker, '/datasets/<token_prefix>/<dataset_prefix>/fork/<dest_token_gui>')
     api.add_resource(DatasetElements, '/datasets/<token_prefix>/<dataset_prefix>/elements')
+    api.add_resource(DatasetElementsBundle, '/datasets/<token_prefix>/<dataset_prefix>/elements/bundle')
     api.add_resource(DatasetElement, '/datasets/<token_prefix>/<dataset_prefix>/elements/<element_id>')
     api.add_resource(DatasetElementContent, '/datasets/<token_prefix>/<dataset_prefix>/elements/<element_id>/content')
     api.add_resource(DatasetElementContentBundle, '/datasets/<token_prefix>/<dataset_prefix>/elements/content')
-    app.run(host="localhost", debug=False, threaded=True)
+    app.run(host=global_config.get_host(), port=global_config.get_port(), debug=False, threaded=True)
     garbage_collector.stop()
     global_config.get_local_storage().close()
 

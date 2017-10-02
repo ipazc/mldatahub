@@ -21,13 +21,14 @@
 # MA  02110-1301, USA.
 
 from flask import request
-from flask_restful import reqparse
+from flask_restful import reqparse, abort
 from mldatahub.api.tokenized_resource import TokenizedResource, control_access
 from mldatahub.config.config import global_config, now
 from mldatahub.config.privileges import Privileges
 from mldatahub.factory.dataset_factory import DatasetFactory
 from mldatahub.factory.token_factory import TokenFactory
 from mldatahub.odm.dataset_dao import DatasetDAO
+from mldatahub.odm.token_dao import TokenDAO
 
 __author__ = 'Iván de Paz Centeno'
 
@@ -222,4 +223,69 @@ class Dataset(TokenizedResource):
 
 
 class DatasetForker(TokenizedResource):
-    pass
+
+    def __init__(self):
+        super().__init__()
+        self.post_parser = reqparse.RequestParser()
+        self.session = global_config.get_session()
+        arguments = {
+            "url_prefix":
+                {
+                    "type": str,
+                    "required": True,
+                    "help": "URL prefix for this dataset. Characters \"{}\" not allowed".format(DatasetFactory.illegal_chars),
+                    "location": "json"
+                },
+            "title":
+                {
+                    "type": str,
+                    "required": True,
+                    "help": "Title for the dataset.",
+                    "location": "json"
+                },
+            "description":
+                {
+                    "type": str,
+                    "required": True,
+                    "help": "Description for the dataset.",
+                    "location": "json"
+                },
+            "reference":
+                {
+                    "type": str,
+                    "required": True,
+                    "help": "Reference data (perhaps a Bibtex in string format?)",
+                    "location": "json"
+                },
+            "tags":
+                {
+                    "type": list,
+                    "required": False,
+                    "help": "Tags for the dataset (ease the searches for this dataset).",
+                    "location": "json"
+                },
+        }
+
+        for argument, kwargs in arguments.items():
+            self.post_parser.add_argument(argument, **kwargs)
+
+    @control_access()
+    def post(self, token_prefix, dataset_prefix, dest_token_gui):
+        required_privileges = [
+            Privileges.RO_WATCH_DATASET,
+            Privileges.ADMIN_EDIT_TOKEN
+        ]
+        _, token = self.token_parser.parse_args(request)
+
+        kwargs = self.post_parser.parse_args()
+
+        dest_token = TokenDAO.query.get(token_gui=dest_token_gui)
+
+        dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
+
+        if dest_token is None:
+            abort(404, message="Token not found.")
+
+        dataset = DatasetFactory(dest_token).fork_dataset(dataset_url_prefix, token, **kwargs)
+
+        return dataset.serialize()
