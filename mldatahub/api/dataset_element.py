@@ -248,9 +248,9 @@ class DatasetElementsBundle(TokenizedResource):
         # That json value is required, it is validated by the delete_parser; so, it is ensured that key exists in the dict.
         elements_kwargs = request.json['elements']
 
-        edited_elements = DatasetElementFactory(token, dataset).edit_elements(elements_kwargs)
-
+        edited_elements = DatasetElementFactory(token, dataset).edit_elements({ObjectId(k): v for k, v in elements_kwargs.items()})
         return [element.serialize() for element in edited_elements]
+
 
 class DatasetElement(TokenizedResource):
 

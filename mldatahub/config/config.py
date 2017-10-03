@@ -108,7 +108,7 @@ class GlobalConfig(object):
 
     def get_session(self):
         if 'session_uri' not in self.config_values:
-            self.set_session_uri("mongodb://localhost:27017/mlhubdata")
+            self.set_session_uri("mongodb://localhost:27017/mldatahub")
 
         if self.session is None:
             self.session = ThreadLocalODMSession(bind=create_datastore(self.config_values['session_uri']))
