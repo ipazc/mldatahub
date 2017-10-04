@@ -148,6 +148,8 @@ def build_app():
     api.add_resource(DatasetElementContent, '/datasets/<token_prefix>/<dataset_prefix>/elements/<element_id>/content')
     api.add_resource(DatasetElementContentBundle, '/datasets/<token_prefix>/<dataset_prefix>/elements/content')
 
+    return app
+
 def deploy():
     app = build_app()
     global_config.print_config()
