@@ -206,7 +206,7 @@ class DatasetElementsBundle(TokenizedResource):
 
         DatasetElementFactory(token, dataset).destroy_elements([ObjectId(x) for x in elements_ids])
 
-        return 200, "Done."
+        return 200
 
     @control_access()
     def post(self, token_prefix, dataset_prefix):

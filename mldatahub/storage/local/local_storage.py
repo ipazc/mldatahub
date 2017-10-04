@@ -90,7 +90,7 @@ class LocalStorage(GenericStorage):
         try:
             with open(os.path.join(self.root_key, file_id), "rb") as f:
                 content_bytes = f.read()
-        except FileNotFoundError as ex:
+        except Exception as ex:
             content_bytes = b""
 
         return content_bytes

@@ -204,6 +204,9 @@ class DatasetElementFactory(object):
                 if k is not None and v is not None:
                     dataset_element[k] = v
 
+        if dataset_elements.count() == 0:
+            abort(404, message="Elements not found.")
+
         self.session.flush()
 
         return dataset_elements
@@ -286,7 +289,7 @@ class DatasetElementFactory(object):
 
         query["dataset_id"] = self.dataset._id
 
-        return DatasetElementDAO.query.find(query).skip(page*global_config.get_page_size()).limit(global_config.get_page_size())
+        return DatasetElementDAO.query.find(query).skip(page*global_config.get_page_size()).limit(global_config.get_page_size()).sort("addition_date", 1)
 
     def get_specific_elements_info(self, elements_id:list) -> ODMCursor:
         can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
@@ -298,7 +301,7 @@ class DatasetElementFactory(object):
         if len(elements_id) > global_config.get_page_size():
             abort(416, message="Page size exceeded")
 
-        return DatasetElementDAO.query.find({"dataset_id": self.dataset._id, "_id": {"$in": elements_id }})
+        return DatasetElementDAO.query.find({"dataset_id": self.dataset._id, "_id": {"$in": elements_id }}).sort("addition_date", 1)
 
     def get_element_thumbnail(self, element_id:ObjectId) -> bytes:
         # The get_element_info() method is going to make all the required checks for the retrieval of the thumbnail.
