@@ -35,6 +35,7 @@ def main():
     group.add_argument("-d", "--deploy", action="store_true", help="Deploys the ML Data Hub using the /etc/mldatahub/config.json options.")
     group.add_argument("-p", "--purge-dataset", action="store_true", dest="purge_dataset", help="Purges the dataset and leaves it in a clean state.")
     group.add_argument("-c", "--create-token", action="store_true", dest="create_token", help="Creates a standard privileged token (create datasets).")
+    group.add_argument("-g", "--garbage-collector", action="store_true", dest="garbage_collector", help="Instances the Garbage Collector for freed files.")
 
     if "--create-token" in sys.argv:
         index = sys.argv.index("--create-token")
@@ -58,6 +59,8 @@ def main():
         purge_dataset()
     elif args.create_token:
         create_token(sys.argv[index+1:])
+    elif args.garbage_collector:
+        deploy_gc()
     else:
         parser.print_help()
 
@@ -119,21 +122,19 @@ def create_token(args):
     print("*****************************************")
     print("TOKEN:", token.token_gui)
 
-
-def deploy():
+def build_app():
     from flask import Flask
     from flask_restful import Api
     from mldatahub.api.dataset import Datasets, Dataset, DatasetForker
-    from mldatahub.api.dataset_element import DatasetElements, DatasetElement, DatasetElementContent, DatasetElementsBundle, \
+    from mldatahub.api.dataset_element import DatasetElements, DatasetElement, DatasetElementContent, \
+        DatasetElementsBundle, \
         DatasetElementContentBundle
     from mldatahub.api.server import Server
     from mldatahub.api.token import Tokens, Token, TokenLinker
-    from mldatahub.observer.garbage_collector import GarbageCollector
 
     app = Flask(__name__)
     api = Api(app)
 
-    garbage_collector = GarbageCollector()
     api.add_resource(Server, '/server')
     api.add_resource(Tokens, '/tokens')
     api.add_resource(Token, '/tokens/<token_id>')
@@ -146,8 +147,16 @@ def deploy():
     api.add_resource(DatasetElement, '/datasets/<token_prefix>/<dataset_prefix>/elements/<element_id>')
     api.add_resource(DatasetElementContent, '/datasets/<token_prefix>/<dataset_prefix>/elements/<element_id>/content')
     api.add_resource(DatasetElementContentBundle, '/datasets/<token_prefix>/<dataset_prefix>/elements/content')
+
+def deploy():
+    app = build_app()
     global_config.print_config()
     app.run(host=global_config.get_host(), port=global_config.get_port(), debug=False, threaded=True)
+
+def deploy_gc():
+    from mldatahub.observer.garbage_collector import GarbageCollector
+    garbage_collector = GarbageCollector()
+    print("Collecting garbage... hit CTRL+C to close this safely.\n Closing safely this process is **highly recommended**.")
     garbage_collector.stop()
     global_config.get_local_storage().close()
 

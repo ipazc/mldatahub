@@ -45,7 +45,7 @@ class GarbageCollector(object):
     last_tick = now()
 
     def __init__(self):
-        self.thread = Thread(target=self.__thread_func)
+        self.thread = Thread(target=self.__thread_func, daemon=True)
         self.thread.start()
 
     def __stop_requested(self):
