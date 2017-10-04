@@ -264,6 +264,13 @@ class DatasetForker(TokenizedResource):
                     "help": "Tags for the dataset (ease the searches for this dataset).",
                     "location": "json"
                 },
+            "options":
+                {
+                    "type": dict,
+                    "required": False,
+                    "location": "json",
+                    "help": "options string"
+                }
         }
 
         for argument, kwargs in arguments.items():
@@ -275,7 +282,7 @@ class DatasetForker(TokenizedResource):
             Privileges.RO_WATCH_DATASET,
             Privileges.ADMIN_EDIT_TOKEN
         ]
-        _, token = self.token_parser.parse_args(request)
+        _, token = self.token_parser.parse_args(request, required_any_token_privileges=required_privileges)
 
         kwargs = self.post_parser.parse_args()
 
@@ -286,6 +293,16 @@ class DatasetForker(TokenizedResource):
         if dest_token is None:
             abort(404, message="Token not found.")
 
+        if 'options' in request.json:
+            options = request.json['options']
+        else:
+            options = None
+
+        kwargs['options'] = options
+        kwargs['tags'] = request.json['tags']
+
         dataset = DatasetFactory(dest_token).fork_dataset(dataset_url_prefix, token, **kwargs)
+
+        dest_token = TokenFactory(dest_token).link_datasets(dest_token.token_gui, [dataset])
 
         return dataset.serialize()

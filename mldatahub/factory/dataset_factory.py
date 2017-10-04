@@ -94,13 +94,20 @@ class DatasetFactory(object):
         if target_dataset is None:
             abort(404, message="Dataset wasn't found.")
 
+        if 'options' in kwargs:
+            options = kwargs['options']
+            del kwargs['options']
+        else:
+            options = None
+
         fork_dataset = self.create_dataset(*args, **kwargs)
 
         target_dataset.fork_count += 1
         fork_dataset.forked_from = target_dataset
 
         # Now we clone all the elements.
-        for element in target_dataset.elements:
+
+        for element in target_dataset.get_elements(options):
             fork_dataset.add_element(element.title, element.description, element.file_ref_id, element.http_ref, list(element.tags))
 
         self.session.flush()

@@ -117,6 +117,14 @@ class DatasetDAO(MappedClass):
     def has_element(self, element):
         return DatasetElementDAO.query.get(_id=element._id, dataset_id=self._id) is not None
 
+    def get_elements(self, options=None):
+        query = options
+        if query is None:
+            query = {}
+
+        query['dataset_id'] = self._id
+
+        return DatasetElementDAO.query.find(query).sort("addition_date", 1)
 
 class DatasetElementDAO(MappedClass):
 
