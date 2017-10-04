@@ -9,7 +9,7 @@
   "storage_cache_file": "$HOME/file_list.json",
 
   "#4":"Max number of accesses to allow in less than 'access_reset_time' seconds before blocking the connection.",
-  "max_access_times": 250,
+  "max_access_times": 20,
 
   "#5":"Time window in seconds to for the 'max_access_times'.",
   "access_reset_time": 1,

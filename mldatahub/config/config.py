@@ -58,12 +58,14 @@ class GlobalConfig(object):
                 self.config_values['local_storage_uri'] = self.config_values['local_storage_uri'].replace("$HOME", HOME)
                 self.config_values['storage_cache_file'] = self.config_values['storage_cache_file'].replace("$HOME", HOME)
 
-            print("Config read:")
-            for k, v in self.config_values.items():
-                if not k.startswith("#"):
-                    print("{}: {}".format(k, v))
         except FileNotFoundError as ex:
             print("Config file not found. Running on default values.")
+
+    def print_config(self):
+        for k, v in self.config_values.items():
+            if not k.startswith("#"):
+                print("{}: {}".format(k, v))
+
     def set_host(self, new_host):
         self.config_values['host'] = new_host
 
