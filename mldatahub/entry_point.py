@@ -102,6 +102,7 @@ def create_token(args):
         print("[ERROR] The namespace can't hold any of the following chars:\n\"{}\"".format(illegal_chars))
         exit(-1)
 
+    from mldatahub.odm.dataset_dao import DatasetDAO
     from mldatahub.odm.token_dao import TokenDAO
     token = TokenDAO(args.description, args.maxds, args.maxl, args.namespace, privileges=args.privileges)
 
