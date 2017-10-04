@@ -19,7 +19,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
-
+import signal
 import sys
 import mldatahub
 from mldatahub.config.config import global_config
@@ -154,9 +154,14 @@ def deploy():
     app.run(host=global_config.get_host(), port=global_config.get_port(), debug=False, threaded=True)
 
 def deploy_gc():
+    def signal_handler(signal, frame):
+        print('CTRL+C detected. Exiting...')
+
     from mldatahub.observer.garbage_collector import GarbageCollector
     garbage_collector = GarbageCollector()
     print("Collecting garbage... hit CTRL+C to close this safely.\n Closing safely this process is **highly recommended**.")
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.pause()
     garbage_collector.stop()
     global_config.get_local_storage().close()
 
