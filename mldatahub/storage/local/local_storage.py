@@ -20,12 +20,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import json
 import os
 from multiprocessing import Lock
 import shutil
 import uuid
-from mldatahub.config.config import global_config, now
+from mldatahub.config.config import global_config
+from mldatahub.odm.file_dao import FileDAO
 from mldatahub.storage.generic_storage import GenericStorage
 
 __author__ = 'Iván de Paz Centeno'
@@ -43,30 +43,6 @@ class LocalStorage(GenericStorage):
         if not os.path.exists(root_key):
             os.makedirs(root_key)
 
-        # Initializing...
-        try:
-            with open(global_config.get_storage_cache_file()) as f:
-                files_descr = json.load(f)
-        except FileNotFoundError as ex:
-            files_descr = {'closed': False, 'files': []}
-
-        if not files_descr['closed']:
-            print("Storage wasn't closed gracefully. It must be reloaded and it may take several minutes...")
-            files_descr = {'closed': True, 'files': os.listdir(root_key)}
-
-        with open(global_config.get_storage_cache_file(), "w") as f:
-            json.dump(files_descr, f, indent=4)
-
-        self.files_list = set(files_descr['files'])
-
-        self.last_saved_check = now()
-
-    def _save_file_list(self, closed=False):
-        files_descr = {'closed': closed, 'files': list(self.files_list)}
-        with open(global_config.get_storage_cache_file(), "w") as f:
-            json.dump(files_descr, f, indent=4)
-        self.last_saved_check = now()
-
     def put_file_content(self, content_bytes, file_id=None):
         if file_id is None:
             file_id = self._generate_token()
@@ -75,7 +51,8 @@ class LocalStorage(GenericStorage):
             f.write(content_bytes)
 
         with self.lock:
-            self.files_list.add(file_id)
+            FileDAO(file_reference=file_id)
+            global_config.get_session().flush()
 
         return file_id
 
@@ -96,8 +73,10 @@ class LocalStorage(GenericStorage):
         return content_bytes
 
     def delete_file_content(self, file_id):
-        if file_id in self.files_list:
-            self.files_list.remove(file_id)
+        file = FileDAO.query.get(file_reference=file_id)
+        if file is not None:
+            file.delete()
+            global_config.get_session().flush()
 
         if os.path.exists(os.path.join(self.root_key, file_id)):
             os.remove(os.path.join(self.root_key, file_id))
@@ -105,25 +84,15 @@ class LocalStorage(GenericStorage):
             raise FileNotFoundError()
 
     def __iter__(self):
-        files_list = self.files_list
+        files_list = FileDAO.query.find()
 
         for f in files_list:
-            yield f
+            yield f.file_reference
+
+    def __len__(self):
+        return FileDAO.query.find().count()
 
     def delete(self):
         if os.path.exists(self.root_key):
             shutil.rmtree(self.root_key)
-        self.files_list = set()
-        self._save_file_list()
-
-    def heart_pulse(self):
-        """
-        Performs check to save the storage list into a file if required.
-        Should by called by an external timer.
-        :return:
-        """
-        if (now() - self.last_saved_check).total_seconds() > SAVE_INTERVAL:
-            self._save_file_list()
-
-    def close(self):
-        self._save_file_list(closed=True)
+        FileDAO.query.remove()

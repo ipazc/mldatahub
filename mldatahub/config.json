@@ -5,27 +5,24 @@
   "#2":"The local storage where the files are going to be stored.",
   "local_storage_uri": "$HOME/storage",
 
-  "#3":"The location of the local-storage cache file.",
-  "storage_cache_file": "$HOME/file_list.json",
-
-  "#4":"Max number of accesses to allow in less than 'access_reset_time' seconds before blocking the connection.",
+  "#3":"Max number of accesses to allow in less than 'access_reset_time' seconds before blocking the connection.",
   "max_access_times": 20,
 
-  "#5":"Time window in seconds to for the 'max_access_times'.",
+  "#4":"Time window in seconds to for the 'max_access_times'.",
   "access_reset_time": 1,
 
-  "#6":"Max number of dataset's elements retrieved within a single request.",
+  "#5":"Max number of dataset's elements retrieved within a single request.",
   "page_size": 100,
 
-  "#7":"Time interval in seconds between the save of the storage file cache into disk.",
+  "#6":"Time interval in seconds between the save of the storage file cache into disk.",
   "save_interval": 180,
 
-  "#8":"Time interval in seconds between Garbage Collector collecting unreferenced elements.",
+  "#7":"Time interval in seconds between Garbage Collector collecting unreferenced elements.",
   "garbage_collector_time_interval": 600,
 
-  "#9":"Listen host",
+  "#8":"Listen host",
   "host": "localhost",
 
-  "#10":"Listen port",
+  "#9":"Listen port",
   "port": "5555"
 }

@@ -20,6 +20,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
+from mldatahub.odm.file_dao import FileDAO
 
 __author__ = 'Iván de Paz Centeno'
 
@@ -88,8 +89,23 @@ class TestLocalStorage(unittest.TestCase):
                 str(ex.exception)
             )
 
+    def test_storage_list_files(self):
+        """
+        Tests that the storage successfully stores the files refs list rather than iterating over filesystem.
+        """
+        storage = LocalStorage(self.temp_path)
+        storage.put_file_content(b"asd", "none")
+
+        self.assertEqual(len(storage), 1)
+        for file in storage:
+            self.assertEqual(file, "none")
+
+        storage.delete_file_content("none")
+        self.assertEqual(len(storage), 0)
+
     def tearDown(self):
         shutil.rmtree(self.temp_path)
+        FileDAO.query.remove()
 
 if __name__ == '__main__':
     unittest.main()

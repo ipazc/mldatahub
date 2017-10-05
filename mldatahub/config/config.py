@@ -56,7 +56,6 @@ class GlobalConfig(object):
                 self.config_values = json.load(f)
 
                 self.config_values['local_storage_uri'] = self.config_values['local_storage_uri'].replace("$HOME", HOME)
-                self.config_values['storage_cache_file'] = self.config_values['storage_cache_file'].replace("$HOME", HOME)
 
         except FileNotFoundError as ex:
             print("Config file not found. Running on default values.")
@@ -77,9 +76,6 @@ class GlobalConfig(object):
 
     def set_local_storage_uri(self, new_uri):
         self.config_values['local_storage_uri'] = new_uri
-
-    def set_storage_cache_file(self, new_storage_filename):
-        self.config_values['storage_cache_file'] = new_storage_filename
 
     def set_page_size(self, new_page_size):
         self.config_values['page_size'] = new_page_size
@@ -126,11 +122,6 @@ class GlobalConfig(object):
             self.local_storage = LocalStorage(self.config_values['local_storage_uri'])
 
         return self.local_storage
-
-    def get_storage_cache_file(self):
-        if 'storage_cache_file' not in self.config_values:
-            self.config_values['storage_cache_file'] = os.path.join(HOME, 'file_list.json')
-        return self.config_values['storage_cache_file']
 
     def get_max_access_times(self):
         if 'max_access_times' not in self.config_values:

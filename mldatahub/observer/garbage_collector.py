@@ -64,6 +64,7 @@ class GarbageCollector(object):
         print("[GC] Exited.")
 
     def do_garbage_collect(self):
+        global_config.session.clear()
         refs_in_use = {element.file_ref_id for element in DatasetElementDAO.query.find({})}
         garbage_files = {ref for ref in self.local_storage if ref not in refs_in_use}
 
