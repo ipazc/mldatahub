@@ -74,7 +74,6 @@ class GarbageCollector(object):
             except FileNotFoundError:
                 print("skipped {} as it wasn't found on filesystem".format(file_id))
 
-        self.local_storage._save_file_list()
         print("[GC] Cleaned {} elements".format(len(garbage_files)))
 
     def stop(self, wait_for_finish=True):
