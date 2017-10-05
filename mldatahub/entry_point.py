@@ -166,7 +166,6 @@ def deploy_gc():
     signal.signal(signal.SIGINT, signal_handler)
     signal.pause()
     garbage_collector.stop()
-    global_config.get_local_storage().close()
 
 if __name__ == '__main__':
     main()
