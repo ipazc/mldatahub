@@ -94,8 +94,12 @@ class Datasets(TokenizedResource):
         ]
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
+        result = [dataset.serialize() for dataset in token.datasets]
 
-        return [dataset.serialize() for dataset in token.datasets]
+        self.session.flush()
+        self.session.clear()
+
+        return result
 
     @control_access()
     def post(self):
@@ -120,7 +124,12 @@ class Datasets(TokenizedResource):
 
         token = TokenFactory(token).link_datasets(token.token_gui, [dataset])
 
-        return dataset.serialize(), 201
+        result = dataset.serialize()
+
+        self.session.flush()
+        self.session.clear()
+
+        return result, 201
 
 class Dataset(TokenizedResource):
 
@@ -183,8 +192,12 @@ class Dataset(TokenizedResource):
         full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
+        result = dataset.serialize()
 
-        return dataset.serialize(), 200
+        self.session.flush()
+        self.session.clear()
+
+        return result, 200
 
     @control_access()
     def patch(self, token_prefix, dataset_prefix):
@@ -205,6 +218,9 @@ class Dataset(TokenizedResource):
 
         DatasetFactory(token).edit_dataset(full_dataset_url_prefix, **kwargs)
 
+        self.session.flush()
+        self.session.clear()
+
         return "Done", 200
 
     @control_access()
@@ -218,6 +234,9 @@ class Dataset(TokenizedResource):
         full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         DatasetFactory(token).destroy_dataset(full_dataset_url_prefix)
+
+        self.session.flush()
+        self.session.clear()
 
         return "Done", 200
 
@@ -304,5 +323,9 @@ class DatasetForker(TokenizedResource):
         dataset = DatasetFactory(dest_token).fork_dataset(dataset_url_prefix, token, **kwargs)
 
         dest_token = TokenFactory(dest_token).link_datasets(dest_token.token_gui, [dataset])
+        result = dataset.serialize()
 
-        return dataset.serialize()
+        self.session.flush()
+        self.session.clear()
+
+        return result

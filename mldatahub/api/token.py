@@ -98,7 +98,12 @@ class Tokens(TokenizedResource):
 
         tokens = TokenFactory(token).get_tokens(**args)
 
-        return [t.serialize() for t in tokens], 201
+        result = [t.serialize() for t in tokens], 201
+
+        self.session.flush()
+        self.session.clear()
+
+        return result
 
     @control_access()
     def post(self):
@@ -112,7 +117,12 @@ class Tokens(TokenizedResource):
 
         created_token = TokenFactory(token).create_token(**{k:v for k,v in args.items() if v is not None})
 
-        return created_token.serialize(), 201
+        result = created_token.serialize(), 201
+
+        self.session.flush()
+        self.session.clear()
+
+        return result
 
 
 class Token(TokenizedResource):
@@ -196,7 +206,12 @@ class Token(TokenizedResource):
 
         view_token = TokenFactory(token).get_token(token_id)
 
-        return view_token.serialize(), 201
+        result = view_token.serialize(), 201
+
+        self.session.flush()
+        self.session.clear()
+
+        return result
 
     @control_access()
     def patch(self, token_id):
@@ -212,8 +227,12 @@ class Token(TokenizedResource):
             abort(401)
 
         edited_token = TokenFactory(token).edit_token(token_id, **args)
+        result = edited_token.serialize(), 201
 
-        return edited_token.serialize(), 201
+        self.session.flush()
+        self.session.clear()
+
+        return result
 
     @control_access()
     def delete(self, token_id):
@@ -230,6 +249,9 @@ class Token(TokenizedResource):
 
         TokenFactory(token).delete_token(token_id)
 
+        self.session.flush()
+        self.session.clear()
+
         return "Done", 201
 
 
@@ -237,6 +259,11 @@ class TokenLinker(TokenizedResource):
     """
     API to link/unlink a token to a dataset
     """
+
+    def __init__(self):
+        super().__init__()
+        self.session = global_config.get_session()
+
     @control_access()
     def put(self, token_id, token_prefix, dataset_prefix):
         required_any_privileges = [
@@ -248,6 +275,9 @@ class TokenLinker(TokenizedResource):
         url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         token = TokenFactory(token).link_datasets(token_id, [url_prefix])
+
+        self.session.flush()
+        self.session.clear()
 
         return "Done", 200
 
@@ -262,5 +292,8 @@ class TokenLinker(TokenizedResource):
         url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         token = TokenFactory(token).unlink_datasets(token_id, [url_prefix])
+
+        self.session.flush()
+        self.session.clear()
 
         return "Done", 200

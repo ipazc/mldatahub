@@ -112,7 +112,12 @@ class DatasetElements(TokenizedResource):
 
         elements_info = DatasetElementFactory(token, dataset).get_elements_info(page, options=options)
 
-        return [element.serialize() for element in elements_info]
+        result = [element.serialize() for element in elements_info]
+
+        self.session.flush()
+        self.session.clear()
+
+        return result
 
     @control_access()
     def post(self, token_prefix, dataset_prefix):
@@ -143,7 +148,12 @@ class DatasetElements(TokenizedResource):
 
         self.session.flush()
 
-        return str(element._id), 201
+        result=str(element._id)
+
+        self.session.flush()
+        self.session.clear()
+
+        return result, 201
 
 
 class DatasetElementsBundle(TokenizedResource):
@@ -183,7 +193,12 @@ class DatasetElementsBundle(TokenizedResource):
 
         elements_info = DatasetElementFactory(token, dataset).get_specific_elements_info([ObjectId(x) for x in elements_ids])
 
-        return [element.serialize() for element in elements_info]
+        result = [element.serialize() for element in elements_info]
+
+        self.session.flush()
+        self.session.clear()
+
+        return result
 
     @control_access()
     def delete(self, token_prefix, dataset_prefix):
@@ -205,6 +220,9 @@ class DatasetElementsBundle(TokenizedResource):
         elements_ids = request.json['elements']
 
         DatasetElementFactory(token, dataset).destroy_elements([ObjectId(x) for x in elements_ids])
+
+        self.session.flush()
+        self.session.clear()
 
         return 200
 
@@ -228,7 +246,12 @@ class DatasetElementsBundle(TokenizedResource):
 
         elements_created = DatasetElementFactory(token, dataset).create_elements(elements_kwargs)
 
-        return [element.serialize() for element in elements_created]
+        result = [element.serialize() for element in elements_created]
+
+        self.session.flush()
+        self.session.clear()
+
+        return result
 
     @control_access()
     def patch(self, token_prefix, dataset_prefix):
@@ -249,7 +272,12 @@ class DatasetElementsBundle(TokenizedResource):
         elements_kwargs = request.json['elements']
 
         edited_elements = DatasetElementFactory(token, dataset).edit_elements({ObjectId(k): v for k, v in elements_kwargs.items()})
-        return [element.serialize() for element in edited_elements]
+        result = [element.serialize() for element in edited_elements]
+
+        self.session.flush()
+        self.session.clear()
+
+        return result
 
 
 class DatasetElement(TokenizedResource):
@@ -306,7 +334,12 @@ class DatasetElement(TokenizedResource):
 
         element = DatasetElementFactory(token, dataset).get_element_info(ObjectId(element_id))
 
-        return element.serialize(), 200
+        result = element.serialize()
+
+        self.session.flush()
+        self.session.clear()
+
+        return result, 200
 
     @control_access()
     def patch(self, token_prefix, dataset_prefix, element_id):
@@ -330,6 +363,9 @@ class DatasetElement(TokenizedResource):
 
         DatasetElementFactory(token, dataset).edit_element(ObjectId(element_id), **kwargs)
 
+        self.session.flush()
+        self.session.clear()
+
         return "Done", 200
 
     @control_access()
@@ -345,6 +381,9 @@ class DatasetElement(TokenizedResource):
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
         DatasetElementFactory(token, dataset).destroy_element(ObjectId(element_id))
+
+        self.session.flush()
+        self.session.clear()
 
         return "Done", 200
 
@@ -368,6 +407,9 @@ class DatasetElementContent(TokenizedResource):
 
         content = DatasetElementFactory(token, dataset).get_element_content(ObjectId(element_id))
 
+        self.session.flush()
+        self.session.clear()
+
         return send_file(BytesIO(content), mimetype="application/octet-stream")
 
     @control_access()
@@ -385,6 +427,9 @@ class DatasetElementContent(TokenizedResource):
 
         content = request.stream.read()
         DatasetElementFactory(token, dataset).edit_element(ObjectId(element_id), content=content)
+
+        self.session.flush()
+        self.session.clear()
 
         return "Done", 200
 
@@ -431,6 +476,9 @@ class DatasetElementContentBundle(TokenizedResource):
 
         packet = PyZip(elements_content)
 
+        self.session.flush()
+        self.session.clear()
+
         return send_file(BytesIO(packet.to_bytes()), mimetype="application/octet-stream")
 
     @control_access()
@@ -450,5 +498,8 @@ class DatasetElementContentBundle(TokenizedResource):
 
         crafted_request = {ObjectId(k): {'content': v} for k, v in packet.items()}
         DatasetElementFactory(token, dataset).edit_elements(crafted_request)
+
+        self.session.flush()
+        self.session.clear()
 
         return "Done", 200

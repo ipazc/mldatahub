@@ -41,7 +41,7 @@ class Server(TokenizedResource):
     @control_access()
     def get(self):
         """
-        Retrieves all the datasets associated to the current token.
+        Retrieves all the information of the server.
         :return:
         """
         required_privileges = [
@@ -56,28 +56,3 @@ class Server(TokenizedResource):
         }
 
         return response
-
-    @control_access()
-    def post(self):
-        """
-        Creates a dataset and links it to the token
-        :return:
-        """
-        required_privileges = [
-            Privileges.CREATE_DATASET,
-            Privileges.EDIT_DATASET,
-            Privileges.ADMIN_EDIT_TOKEN
-        ]
-
-        _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
-        kwargs = self.post_parser.parse_args()
-        if 'tags' in request.json:
-            kwargs['tags'] = request.json['tags'] # fast fix for split-bug of the tags.
-
-        dataset = DatasetFactory(token).create_dataset(**kwargs)
-
-        self.session.flush()
-
-        token = TokenFactory(token).link_datasets(token.token_gui, [dataset])
-
-        return dataset.serialize(), 201
