@@ -26,8 +26,7 @@ from werkzeug.exceptions import Unauthorized, BadRequest
 from mldatahub.config.privileges import Privileges
 import unittest
 from mldatahub.factory.dataset_factory import DatasetFactory
-from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO, \
-    taken_url_prefixes
+from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO
 from mldatahub.odm.token_dao import TokenDAO
 
 
@@ -53,7 +52,6 @@ class TestDatasetFactory(unittest.TestCase):
         DatasetElementDAO.query.remove()
         DatasetElementCommentDAO.query.remove()
         TokenDAO.query.remove()
-        taken_url_prefixes.clear()
 
     def test_dataset_creation(self):
         """
@@ -302,7 +300,6 @@ class TestDatasetFactory(unittest.TestCase):
         DatasetElementDAO.query.remove()
         DatasetElementCommentDAO.query.remove()
         TokenDAO.query.remove()
-        taken_url_prefixes.clear()
 
 if __name__ == '__main__':
     unittest.main()

@@ -25,8 +25,7 @@ global_config.set_session_uri("mongodb://localhost:27017/unittests")
 from werkzeug.exceptions import Unauthorized, Conflict, BadRequest
 from mldatahub.config.privileges import Privileges
 import unittest
-from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO, \
-    taken_url_prefixes
+from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO
 from mldatahub.factory.token_factory import TokenFactory
 from mldatahub.odm.token_dao import TokenDAO
 
@@ -43,7 +42,6 @@ class TestTokenFactory(unittest.TestCase):
         DatasetElementDAO.query.remove()
         DatasetElementCommentDAO.query.remove()
         TokenDAO.query.remove()
-        taken_url_prefixes.clear()
 
     def test_factory_creation_token(self):
         """
@@ -361,7 +359,6 @@ class TestTokenFactory(unittest.TestCase):
         DatasetElementDAO.query.remove()
         DatasetElementCommentDAO.query.remove()
         TokenDAO.query.remove()
-        taken_url_prefixes.clear()
 
 if __name__ == '__main__':
     unittest.main()

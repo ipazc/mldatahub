@@ -25,7 +25,7 @@ __author__ = 'Iván de Paz Centeno'
 import unittest
 from mldatahub.config.config import global_config
 global_config.set_session_uri("mongodb://localhost:27017/unittests")
-from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO, taken_url_prefixes
+from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO
 
 
 class TestDatasetODM(unittest.TestCase):
@@ -36,7 +36,6 @@ class TestDatasetODM(unittest.TestCase):
         DatasetCommentDAO.query.remove()
         DatasetElementDAO.query.remove()
         DatasetElementCommentDAO.query.remove()
-        taken_url_prefixes.clear()
 
     def test_create_remove_dataset(self):
         """
@@ -180,7 +179,7 @@ class TestDatasetODM(unittest.TestCase):
         :return:
         """
         dataset = DatasetDAO("ip/asd5", "example5", "desc", "none")
-
+        self.session.flush()
         with self.assertRaises(Exception) as ex:
             dataset2 = DatasetDAO("ip/asd5", "example5", "desc", "none")
 
@@ -201,7 +200,6 @@ class TestDatasetODM(unittest.TestCase):
         DatasetCommentDAO.query.remove()
         DatasetElementDAO.query.remove()
         DatasetElementCommentDAO.query.remove()
-        taken_url_prefixes.clear()
 
 if __name__ == '__main__':
     unittest.main()

@@ -29,7 +29,6 @@ from ming.odm import ForeignIdProperty, RelationProperty, MappedClass, FieldProp
 __author__ = 'Iván de Paz Centeno'
 
 
-taken_url_prefixes = {}
 lock = Lock()
 session = global_config.get_session()
 
@@ -59,10 +58,8 @@ class DatasetDAO(MappedClass):
                  fork_count=0, forked_from=None, forked_from_id=None):
         with lock:
             previous_dset = DatasetDAO.query.get(url_prefix=url_prefix)
-            if previous_dset is not None or url_prefix in taken_url_prefixes:
+            if previous_dset is not None:
                 raise Exception("Url prefix already taken.")
-            else:
-                taken_url_prefixes[url_prefix] = 1
 
         if forked_from_id is None and forked_from is not None:
             forked_from_id = forked_from._id
@@ -89,10 +86,6 @@ class DatasetDAO(MappedClass):
         DatasetElementDAO.query.remove({'dataset_id': self._id})
 
         DatasetDAO.query.remove({'_id': self._id})
-
-        with lock:
-            if url_prefix in taken_url_prefixes:
-                del taken_url_prefixes[url_prefix]
 
     def update(self):
         return session.refresh(self)

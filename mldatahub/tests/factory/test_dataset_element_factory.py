@@ -28,8 +28,7 @@ from mldatahub.factory.dataset_element_factory import DatasetElementFactory
 from werkzeug.exceptions import Unauthorized, BadRequest, RequestedRangeNotSatisfiable, NotFound
 from mldatahub.config.privileges import Privileges
 import unittest
-from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO, \
-    taken_url_prefixes
+from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO
 from mldatahub.odm.token_dao import TokenDAO
 
 
@@ -46,7 +45,6 @@ class TestDatasetElementFactory(unittest.TestCase):
         DatasetElementDAO.query.remove()
         DatasetElementCommentDAO.query.remove()
         TokenDAO.query.remove()
-        taken_url_prefixes.clear()
 
     def test_dataset_element_creation(self):
         """
@@ -770,7 +768,6 @@ class TestDatasetElementFactory(unittest.TestCase):
         DatasetElementDAO.query.remove()
         DatasetElementCommentDAO.query.remove()
         TokenDAO.query.remove()
-        taken_url_prefixes.clear()
 
     @classmethod
     def tearDownClass(cls):
