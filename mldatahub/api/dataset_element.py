@@ -492,7 +492,7 @@ class DatasetElementContentBundle(TokenizedResource):
         full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         content = request.stream.read()
-        packet = PyZip.from_bytes(content)
+        packet = PyZip().from_bytes(content)
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
