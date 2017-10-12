@@ -200,8 +200,8 @@ class TestDatasetFactory(unittest.TestCase):
 
         self.session.flush()
 
-        element1 = DatasetElementDAO("a", "a", "nonea", "noneaa", ["taga"], dataset=d)
-        element2 = DatasetElementDAO("b", "b", "noneb", "nonebb", ["tagb"], dataset=d)
+        element1 = DatasetElementDAO("a", "a", None, "noneaa", ["taga"], dataset=d)
+        element2 = DatasetElementDAO("b", "b", None, "nonebb", ["tagb"], dataset=d)
 
         self.session.flush()
 

@@ -21,7 +21,6 @@
 # MA  02110-1301, USA.
 
 from mldatahub.config.config import global_config
-global_config.set_local_storage_uri("examples/tmp_folder")
 global_config.set_session_uri("mongodb://localhost:27017/unittests")
 global_config.set_page_size(2)
 from mldatahub.factory.dataset_element_factory import DatasetElementFactory
@@ -34,7 +33,7 @@ from mldatahub.odm.token_dao import TokenDAO
 
 __author__ = 'Iván de Paz Centeno'
 
-local_storage = global_config.get_local_storage()
+storage = global_config.get_storage()
 
 class TestDatasetElementFactory(unittest.TestCase):
 
@@ -74,7 +73,7 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         self.assertEqual(element.tags, ["example_tag"])
 
-        content = local_storage.get_file_content(element.file_ref_id)
+        content = storage.get_file(element.file_ref_id).content
         self.assertEqual(content, b"hello")
         self.session.flush()
         # Creator can't create elements referencing existing files directly (Exploit fix)
@@ -144,11 +143,11 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         self.assertEqual(len(elements), 3)
 
-        content = local_storage.get_file_content(elements[0].file_ref_id)
+        content = storage.get_file(elements[0].file_ref_id).content
         self.assertEqual(content, b"hello")
-        content = local_storage.get_file_content(elements[1].file_ref_id)
+        content = storage.get_file(elements[1].file_ref_id).content
         self.assertEqual(content, b"hello2")
-        content = local_storage.get_file_content(elements[2].file_ref_id)
+        content = storage.get_file(elements[2].file_ref_id).content
         self.assertEqual(content, b"hello3")
         dataset = dataset.update()
 
@@ -177,8 +176,8 @@ class TestDatasetElementFactory(unittest.TestCase):
         destructor = destructor.link_dataset(dataset)
         destructor2 = destructor2.link_dataset(dataset2)
 
-        file_id1 = local_storage.put_file_content(b"content1")
-        file_id2 = local_storage.put_file_content(b"content2")
+        file_id1 = storage.put_file_content(b"content1")
+        file_id2 = storage.put_file_content(b"content2")
 
         element  = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
         element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
@@ -213,7 +212,7 @@ class TestDatasetElementFactory(unittest.TestCase):
         DatasetElementFactory(destructor, dataset).destroy_element(element._id)
 
         # Even though element is destroyed, file referenced should still exist
-        self.assertEqual(local_storage.get_file_content(file_id1), b"content1")
+        self.assertEqual(storage.get_file(file_id1).content, b"content1")
 
         dataset = dataset.update()
 
@@ -246,8 +245,8 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         destructor = destructor.link_dataset(dataset)
 
-        file_id1 = local_storage.put_file_content(b"content1")
-        file_id2 = local_storage.put_file_content(b"content2")
+        file_id1 = storage.put_file_content(b"content1")
+        file_id2 = storage.put_file_content(b"content2")
 
         element  = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
         element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
@@ -288,8 +287,8 @@ class TestDatasetElementFactory(unittest.TestCase):
         editor = editor.link_dataset(dataset)
         editor2 = editor2.link_dataset(dataset2)
 
-        file_id1 = local_storage.put_file_content(b"content1")
-        file_id2 = local_storage.put_file_content(b"content2")
+        file_id1 = storage.put_file_content(b"content1")
+        file_id2 = storage.put_file_content(b"content2")
 
         element  = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
         element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
@@ -336,7 +335,7 @@ class TestDatasetElementFactory(unittest.TestCase):
         DatasetElementFactory(editor, dataset).edit_element(element._id, content=b"other_content")
 
         element = element.update()
-        self.assertEqual(local_storage.get_file_content(element.file_ref_id), b"other_content")
+        self.assertEqual(storage.get_file(element.file_ref_id).content, b"other_content")
 
         # Admin can do whatever he wants
         DatasetElementFactory(admin, dataset).edit_element(element2._id, title="changed by admin")
@@ -346,8 +345,8 @@ class TestDatasetElementFactory(unittest.TestCase):
         DatasetElementFactory(admin, dataset2).edit_element(element3._id, file_ref_id=element.file_ref_id)
 
         element3 = element3.update()
-        self.assertEqual(local_storage.get_file_content(element3.file_ref_id),
-                         local_storage.get_file_content(element.file_ref_id))
+        self.assertEqual(storage.get_file(element3.file_ref_id).content,
+                         storage.get_file(element.file_ref_id).content)
 
         self.session.flush()
 
@@ -374,8 +373,8 @@ class TestDatasetElementFactory(unittest.TestCase):
         editor = editor.link_dataset(dataset)
         editor2 = editor2.link_dataset(dataset2)
 
-        file_id1 = local_storage.put_file_content(b"content1")
-        file_id2 = local_storage.put_file_content(b"content2")
+        file_id1 = storage.put_file_content(b"content1")
+        file_id2 = storage.put_file_content(b"content2")
 
         element = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
         element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
@@ -462,7 +461,7 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         editor = editor.link_dataset(dataset)
 
-        elements = [DatasetElementDAO("example{}".format(x), "none", "none", dataset=dataset).title for x in range(5)]
+        elements = [DatasetElementDAO("example{}".format(x), "none", None, dataset=dataset).title for x in range(5)]
 
         self.session.flush()
 
@@ -491,7 +490,7 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         editor = editor.link_dataset(dataset)
 
-        elements = [DatasetElementDAO("example{}".format(x), "none", "none", dataset=dataset) for x in range(5)]
+        elements = [DatasetElementDAO("example{}".format(x), "none", None, dataset=dataset) for x in range(5)]
         titles = [element.title for element in elements]
         ids = [element._id for element in elements]
 
@@ -542,8 +541,8 @@ class TestDatasetElementFactory(unittest.TestCase):
         editor = editor.link_dataset(dataset)
         editor2 = editor2.link_dataset(dataset2)
 
-        file_id1 = local_storage.put_file_content(b"content1")
-        file_id2 = local_storage.put_file_content(b"content2")
+        file_id1 = storage.put_file_content(b"content1")
+        file_id2 = storage.put_file_content(b"content2")
 
         element = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
         element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
@@ -606,8 +605,8 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         editor = editor.link_dataset(dataset)
 
-        file_id1 = local_storage.put_file_content(b"content1")
-        file_id2 = local_storage.put_file_content(b"content2")
+        file_id1 = storage.put_file_content(b"content1")
+        file_id2 = storage.put_file_content(b"content2")
 
         element = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
         element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
@@ -639,8 +638,8 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         editor = editor.link_dataset(dataset)
 
-        file_id1 = local_storage.put_file_content(b"content1")
-        file_id2 = local_storage.put_file_content(b"content2")
+        file_id1 = storage.put_file_content(b"content1")
+        file_id2 = storage.put_file_content(b"content2")
 
         element  = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
         element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
@@ -665,9 +664,9 @@ class TestDatasetElementFactory(unittest.TestCase):
         element3 = element3.update()
 
         self.assertEqual(element.title, "asd6")
-        self.assertEqual(local_storage.get_file_content(element.file_ref_id), b"content4")
+        self.assertEqual(storage.get_file(element.file_ref_id).content, b"content4")
         self.assertEqual(element3.description, "ffff")
-        self.assertEqual(local_storage.get_file_content(element3.file_ref_id), b"New Content!")
+        self.assertEqual(storage.get_file(element3.file_ref_id).content, b"New Content!")
 
     def test_clone_element(self):
         """
@@ -686,8 +685,8 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         editor = editor.link_dataset(dataset)
 
-        file_id1 = local_storage.put_file_content(b"content1")
-        file_id2 = local_storage.put_file_content(b"content2")
+        file_id1 = storage.put_file_content(b"content1")
+        file_id2 = storage.put_file_content(b"content2")
 
         element = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
         element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
@@ -736,8 +735,8 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         editor = editor.link_dataset(dataset)
 
-        file_id1 = local_storage.put_file_content(b"content1")
-        file_id2 = local_storage.put_file_content(b"content2")
+        file_id1 = storage.put_file_content(b"content1")
+        file_id2 = storage.put_file_content(b"content2")
 
         element = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
         element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
@@ -771,7 +770,7 @@ class TestDatasetElementFactory(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        local_storage.delete()
+        storage.delete()
 
 if __name__ == '__main__':
     unittest.main()

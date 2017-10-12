@@ -46,7 +46,7 @@ class GlobalConfig(object):
 
         self.config_values = config_values
         self.session = None
-        self.local_storage = None
+        self.storage = None
 
         self.load_from_file()
 
@@ -74,14 +74,8 @@ class GlobalConfig(object):
     def set_session_uri(self, new_uri):
         self.config_values['session_uri'] = new_uri
 
-    def set_local_storage_uri(self, new_uri):
-        self.config_values['local_storage_uri'] = new_uri
-
     def set_page_size(self, new_page_size):
         self.config_values['page_size'] = new_page_size
-
-    def set_save_interval(self, new_save_interval):
-        self.config_values['save_interval'] = new_save_interval
 
     def set_garbage_collector_timer_interval(self, new_interval):
         self.config_values['garbage_collector_time_interval'] = new_interval
@@ -91,6 +85,9 @@ class GlobalConfig(object):
 
     def set_access_reset_time(self, new_access_reset_time):
         self.config_values['access_reset_time'] = new_access_reset_time
+
+    def set_file_size_limit(self, new_file_size_limit):
+        self.config_values['file_size_limit'] = new_file_size_limit
 
     def get_host(self):
         if 'host' not in self.config_values:
@@ -112,16 +109,12 @@ class GlobalConfig(object):
             self.session = ThreadLocalODMSession(bind=create_datastore(self.config_values['session_uri']))
         return self.session
 
-    def get_local_storage(self):
+    def get_storage(self):
+        if self.storage is None:
+            from mldatahub.storage.remote.mongo_storage import MongoStorage
+            self.storage = MongoStorage()
 
-        if 'local_storage_uri' not in self.config_values:
-            self.config_values['local_storage_uri'] = os.path.join(HOME, 'storage')
-
-        if self.local_storage is None:
-            from mldatahub.storage.local.local_storage import LocalStorage
-            self.local_storage = LocalStorage(self.config_values['local_storage_uri'])
-
-        return self.local_storage
+        return self.storage
 
     def get_max_access_times(self):
         if 'max_access_times' not in self.config_values:
@@ -138,14 +131,14 @@ class GlobalConfig(object):
             self.config_values['page_size'] = 100  # 100 elements per page
         return self.config_values['page_size']
 
-    def get_save_interval(self):
-        if 'save_interval' not in self.config_values:
-            self.config_values['save_interval'] = 180  # 3 minutes
-        return self.config_values['save_interval']
-
     def get_garbage_collector_timer_interval(self):
         if 'garbage_collector_time_interval' not in self.config_values:
             self.config_values['garbage_collector_time_interval'] = 600  # 10 minutes
         return self.config_values['garbage_collector_time_interval']
+
+    def get_file_size_limit(self):
+        if 'file_size_limit' not in self.config_values:
+            self.config_values['file_size_limit'] = 16*1024*1024  # 16 MB
+        return self.config_values['file_size_limit']
 
 global_config = GlobalConfig()

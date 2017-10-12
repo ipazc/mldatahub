@@ -41,7 +41,7 @@ class GarbageCollector(object):
     """
     lock = threading.Lock()
     do_stop = False
-    local_storage = global_config.get_local_storage()
+    local_storage = global_config.get_storage()
     last_tick = now()
 
     def __init__(self):

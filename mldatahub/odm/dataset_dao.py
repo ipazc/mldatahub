@@ -22,6 +22,7 @@
 
 from multiprocessing import Lock
 from mldatahub.config.config import global_config, now
+from mldatahub.odm.file_dao import FileDAO
 from ming import schema
 from ming.odm import ForeignIdProperty, MappedClass, FieldProperty
 
@@ -152,7 +153,7 @@ class DatasetElementDAO(MappedClass):
     _id = FieldProperty(schema.ObjectId)
     title = FieldProperty(schema.String)
     description = FieldProperty(schema.String)
-    file_ref_id = FieldProperty(schema.String)
+    file_ref_id = ForeignIdProperty('FileDAO')
     http_ref = FieldProperty(schema.String)
     tags = FieldProperty(schema.Array(schema.String))
     addition_date = FieldProperty(schema.datetime)

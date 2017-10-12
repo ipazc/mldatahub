@@ -33,11 +33,21 @@ class FileDAO(MappedClass):
 
     class __mongometa__:
         session = session
-        name = 'files'
+        name = 'file'
 
     _id = FieldProperty(schema.ObjectId)
-    file_reference = FieldProperty(schema.String)
+    size = FieldProperty(schema.Int)
+    sha256 = FieldProperty(schema.String)
 
+    @property
+    def content(self):
+        return FileContentDAO.query.get(_id=self._id).content
+
+    def delete(self):
+        FileDAO.query.remove({'_id': self._id})
+
+class FileContentDAO(FileDAO):
+    content = FieldProperty(schema.Binary)
 
 from ming.odm import Mapper
 Mapper.compile_all()

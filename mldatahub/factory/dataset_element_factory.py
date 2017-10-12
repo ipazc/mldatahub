@@ -19,13 +19,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
+
 from bson import ObjectId
 from flask_restful import abort
 from ming.odm.odmsession import ODMCursor
-from mldatahub.storage.local.local_storage import LocalStorage
-
+from mldatahub.storage.generic_storage import GenericStorage
 from mldatahub.factory.dataset_factory import DatasetFactory
-
 from mldatahub.config.config import global_config
 from mldatahub.config.privileges import Privileges
 from mldatahub.odm.token_dao import TokenDAO
@@ -41,7 +40,7 @@ class DatasetElementFactory(object):
         self.token = token
         self.dataset = dataset
         self.session = global_config.get_session()
-        self.local_storage = global_config.get_local_storage() # type: LocalStorage
+        self.storage = global_config.get_storage() # type: GenericStorage
 
         # Can token modify dataset? let's check.
         can_alter_datasets = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
@@ -78,7 +77,7 @@ class DatasetElementFactory(object):
                 abort(401)
         else:
             # We save the file into the storage
-            file_id = self.local_storage.put_file_content(element_content)
+            file_id = self.storage.put_file_content(element_content)
             kwargs['file_ref_id'] = file_id
 
         if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_create_others_elements:
@@ -121,7 +120,7 @@ class DatasetElementFactory(object):
                     abort(401)
             else:
                 # We save the file into the storage
-                file_id = self.local_storage.put_file_content(element_content)
+                file_id = self.storage.put_file_content(element_content)
                 kwargs['file_ref_id'] = file_id
 
             if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_create_others_elements:
@@ -150,7 +149,7 @@ class DatasetElementFactory(object):
 
         if 'content' in kwargs:
             # New content to append here...
-            file_id = self.local_storage.put_file_content(kwargs['content'])
+            file_id = self.storage.put_file_content(kwargs['content'])
             kwargs['file_ref_id'] = file_id
 
         if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_edit_others_elements:
@@ -186,25 +185,39 @@ class DatasetElementFactory(object):
 
         dataset_elements = DatasetElementDAO.query.find({"dataset_id": self.dataset._id, "_id": { "$in" : elements_ids }})
 
+        elements_ids = []
+        elements_content = []
+
+        dataset_elements = [d for d in dataset_elements]
+        # First of all we fill the files modifications to apply at once.
         for dataset_element in dataset_elements:
             kwargs = elements_kwargs[dataset_element._id]
 
             if 'file_ref_id' in kwargs and not can_edit_others_elements:
                 abort(401, message="File ref ID not allowed.")
 
-            if 'content' in kwargs:
-                # New content to append here...
-                file_id = self.local_storage.put_file_content(kwargs['content'])
-                kwargs['file_ref_id'] = file_id
-
             if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_edit_others_elements:
                 abort(401, message="Dataset can't be modified.")
+
+            if 'content' in kwargs:
+                # New content to append here...
+                elements_ids.append(dataset_element._id)
+                elements_content.append(kwargs['content'])
+
+        files_refs = {element_id: file for element_id, file in zip(elements_ids, self.storage.put_files_contents(elements_content))}
+
+        for dataset_element in dataset_elements:
+            kwargs = elements_kwargs[dataset_element._id]
+
+            if 'content' in kwargs:
+                # New content to append here...
+                kwargs['file_ref_id'] = files_refs[dataset_element._id]
 
             for k,v in elements_kwargs[dataset_element._id].items():
                 if k is not None and v is not None:
                     dataset_element[k] = v
 
-        if dataset_elements.count() == 0:
+        if len(dataset_elements) == 0:
             abort(404, message="Elements not found.")
 
         self.session.flush()
@@ -308,7 +321,7 @@ class DatasetElementFactory(object):
         dataset_element = self.get_element_info(element_id)
 
         # TODO: build thumbnail from dataset_element
-        # TODO: Cache layer goes here. Maybe a local CDN?
+        # TODO: Cache layer goes here. Maybe a remote CDN?
         if dataset_element.file_ref_id is not None:
             thumbnail = b''
         else:
@@ -323,21 +336,23 @@ class DatasetElementFactory(object):
         if dataset_element.file_ref_id is None:
             abort(404, message="Element could not be found.")
 
-        content = self.local_storage.get_file_content(dataset_element.file_ref_id)
+        content = self.storage.get_file(dataset_element.file_ref_id).content
 
         return content
 
     def get_elements_content(self, elements_id:list) -> dict:
         # The get_specific_elements_info() method is going to make all the required checks for the retrieval of the thumbnail.
-        dataset_elements = self.get_specific_elements_info(elements_id)
+        dataset_elements = [d for d in self.get_specific_elements_info(elements_id)]
 
-        if dataset_elements.count() < len(elements_id):
+        if len(dataset_elements) < len(elements_id):
             # Let's find which elements do not exist.
             retrieved_elements_ids = [element._id for element in dataset_elements]
             lost_elements = [element_id for element_id in elements_id if element_id not in retrieved_elements_ids]
             abort(404, message="The following elements couldn't be retrieved: {}".format(lost_elements))
 
-        contents = {element._id: self.local_storage.get_file_content(element.file_ref_id) for element in dataset_elements}
+        files_ids = {d.file_ref_id for d in dataset_elements}
+        files = {file.id: file for file in self.storage.get_files(list(files_ids))}
+        contents = {element._id: files[element.file_ref_id].content for element in dataset_elements}
         return contents
 
     def destroy_element(self, element_id:ObjectId) -> DatasetDAO:
