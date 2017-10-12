@@ -23,6 +23,8 @@
 import threading
 from threading import Thread
 from time import sleep
+
+from mldatahub.storage.generic_storage import GenericStorage
 from mldatahub.config.config import now, global_config
 from mldatahub.odm.dataset_dao import DatasetElementDAO
 
@@ -37,11 +39,11 @@ class GarbageCollector(object):
 
     In order to do this optimally, fortunately the storage class keeps a set with all the filenames he worked with,
     it is guaranteed that it is up-to-date and persistent across server reboots.
-    It is better to iterate over this structure than the filesystem itself.
+    It is better to iterate over this structure rather than the filesystem itself.
     """
     lock = threading.Lock()
     do_stop = False
-    local_storage = global_config.get_storage()
+    storage = global_config.get_storage() # type: GenericStorage
     last_tick = now()
 
     def __init__(self):
@@ -66,15 +68,13 @@ class GarbageCollector(object):
     def do_garbage_collect(self):
         global_config.session.clear()
         refs_in_use = {element.file_ref_id for element in DatasetElementDAO.query.find({})}
-        garbage_files = {ref for ref in self.local_storage if ref not in refs_in_use}
+        garbage_files = {file._id for file in self.storage if file._id not in refs_in_use}
 
-        for file_id in garbage_files:
-            try:
-                self.local_storage.delete_file_content(file_id)
-            except FileNotFoundError:
-                print("skipped {} as it wasn't found on filesystem".format(file_id))
+        if len(garbage_files) > 0:
+            self.storage.delete_files(list(garbage_files))
 
         print("[GC] Cleaned {} elements".format(len(garbage_files)))
+        return len(garbage_files)
 
     def stop(self, wait_for_finish=True):
         with self.lock:
