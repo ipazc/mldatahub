@@ -93,9 +93,6 @@ class TestGarbageCollector(unittest.TestCase):
         self.assertEqual(FileDAO.query.find().count(), 0)
         self.assertEqual(gc.do_garbage_collect(), 0)
 
-        #DatasetDAO.add_element()
-
-
     def tearDown(self):
         DatasetDAO.query.remove()
         DatasetElementDAO.query.remove()
