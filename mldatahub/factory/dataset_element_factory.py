@@ -321,7 +321,7 @@ class DatasetElementFactory(object):
         dataset_element = self.get_element_info(element_id)
 
         # TODO: build thumbnail from dataset_element
-        # TODO: Cache layer goes here. Maybe a db CDN?
+        # TODO: Cache layer goes here. Maybe a remote CDN?
         if dataset_element.file_ref_id is not None:
             thumbnail = b''
         else:

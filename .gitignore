@@ -8,7 +8,6 @@ __pycache__/
 
 # Custom
 examples/
-storage/
 debug.py
 file_list.json
 
