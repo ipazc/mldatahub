@@ -111,7 +111,7 @@ class GlobalConfig(object):
 
     def get_storage(self):
         if self.storage is None:
-            from mldatahub.storage.remote_storage.mongo_storage import MongoStorage
+            from mldatahub.storage.db.mongo_storage import MongoStorage
             self.storage = MongoStorage()
 
         return self.storage
