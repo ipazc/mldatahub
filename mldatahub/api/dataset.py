@@ -88,16 +88,16 @@ class Datasets(TokenizedResource):
         Retrieves all the datasets associated to the current token.
         :return:
         """
+        self.session.clear()
+
         required_privileges = [
             Privileges.RO_WATCH_DATASET,
             Privileges.ADMIN_EDIT_TOKEN
         ]
 
         _, token = self.token_parser.parse_args(required_any_token_privileges=required_privileges)
-        result = [dataset.serialize() for dataset in token.datasets]
 
-        self.session.flush()
-        self.session.clear()
+        result = [dataset.serialize() for dataset in token.datasets]
 
         return result
 
@@ -122,12 +122,11 @@ class Datasets(TokenizedResource):
 
         self.session.flush()
 
-        token = TokenFactory(token).link_datasets(token.token_gui, [dataset])
-
-        result = dataset.serialize()
+        TokenFactory(token).link_datasets(token.token_gui, [dataset])
 
         self.session.flush()
-        self.session.clear()
+
+        result = dataset.serialize()
 
         return result, 201
 
@@ -194,9 +193,6 @@ class Dataset(TokenizedResource):
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
         result = dataset.serialize()
 
-        self.session.flush()
-        self.session.clear()
-
         return result, 200
 
     @control_access()
@@ -219,7 +215,6 @@ class Dataset(TokenizedResource):
         DatasetFactory(token).edit_dataset(full_dataset_url_prefix, **kwargs)
 
         self.session.flush()
-        self.session.clear()
 
         return "Done", 200
 
@@ -236,7 +231,6 @@ class Dataset(TokenizedResource):
         DatasetFactory(token).destroy_dataset(full_dataset_url_prefix)
 
         self.session.flush()
-        self.session.clear()
 
         return "Done", 200
 
@@ -322,10 +316,10 @@ class DatasetForker(TokenizedResource):
 
         dataset = DatasetFactory(dest_token).fork_dataset(dataset_url_prefix, token, **kwargs)
 
-        dest_token = TokenFactory(dest_token).link_datasets(dest_token.token_gui, [dataset])
-        result = dataset.serialize()
+        TokenFactory(dest_token).link_datasets(dest_token.token_gui, [dataset])
 
         self.session.flush()
-        self.session.clear()
+
+        result = dataset.serialize()
 
         return result

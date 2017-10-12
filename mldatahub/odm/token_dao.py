@@ -22,14 +22,18 @@
 
 import uuid
 
+from bson import ObjectId
+
 from mldatahub.config.config import global_config, now, token_future_end
 from ming import schema
-from ming.odm import Mapper, ForeignIdProperty, RelationProperty, MappedClass, FieldProperty
+from ming.odm import Mapper, ForeignIdProperty, MappedClass, FieldProperty
 from mldatahub.config.privileges import Privileges
+from mldatahub.odm.dataset_dao import DatasetDAO
 
 __author__ = 'Iván de Paz Centeno'
 
 session = global_config.get_session()
+
 
 
 class TokenDAO(MappedClass):
@@ -49,7 +53,21 @@ class TokenDAO(MappedClass):
     privileges = FieldProperty(schema.Int)
     url_prefix = FieldProperty(schema.String)
     _datasets= ForeignIdProperty('DatasetDAO', uselist=True)
-    datasets = RelationProperty('DatasetDAO')
+
+    class DIterator(object):
+        def __init__(self, dataset_list):
+            self.cursor = DatasetDAO.query.find({'_id': {'$in': list(dataset_list)}})
+
+        def __iter__(self):
+            return self.cursor
+
+        def __len__(self):
+            return self.cursor.count()
+
+
+    @property
+    def datasets(self):
+        return self.DIterator(self._datasets)
 
     def __init__(self, description, max_dataset_count, max_dataset_size, url_prefix, token_gui=None,
                  creation_date=now(), modification_date=now(), end_date=token_future_end(),
@@ -76,28 +94,21 @@ class TokenDAO(MappedClass):
         return self.unlink_datasets([dataset])
 
     def unlink_datasets(self, datasets):
-        old_datasets = list(self.datasets)
-        for dataset in datasets:
-            old_datasets.remove(dataset)
-
-        self.datasets = old_datasets
-        session.flush()
-        return self.update()
+        datasets_translated = [d._id for d in datasets]
+        self._datasets = [d for d in self._datasets if d not in datasets_translated]
+        return self
 
     def link_dataset(self, dataset):
         return self.link_datasets([dataset])
 
     def link_datasets(self, datasets):
-        old_datasets = list(self.datasets)
-        old_datasets += datasets
-        self.datasets = old_datasets
-        session.flush()
-        return self.update()
+        self._datasets += [d._id for d in datasets]
+        return self
 
     def has_dataset(self, dataset):
-        return dataset._id in self._datasets
+        return self.has_dataset_id(dataset._id)
 
-    def has_dataset_id(self, dataset_id):
+    def has_dataset_id(self, dataset_id: ObjectId):
         return dataset_id in self._datasets
 
     def update(self):

@@ -23,7 +23,7 @@
 from multiprocessing import Lock
 from mldatahub.config.config import global_config, now
 from ming import schema
-from ming.odm import ForeignIdProperty, RelationProperty, MappedClass, FieldProperty
+from ming.odm import ForeignIdProperty, MappedClass, FieldProperty
 
 
 __author__ = 'Iván de Paz Centeno'
@@ -32,12 +32,25 @@ __author__ = 'Iván de Paz Centeno'
 lock = Lock()
 session = global_config.get_session()
 
+class GIterator(object):
+    def __init__(self, cursor):
+        self.cursor = cursor
+
+    def __iter__(self):
+        return self.cursor
+
+    def __len__(self):
+        return self.cursor.count()
+
+    def __getitem__(self, item):
+        return next(self.cursor.skip(item))
+
 
 class DatasetDAO(MappedClass):
 
     class __mongometa__:
         session = session
-        name = 'datasets'
+        name = 'dataset'
 
     _id = FieldProperty(schema.ObjectId)
     url_prefix = FieldProperty(schema.String)
@@ -47,18 +60,23 @@ class DatasetDAO(MappedClass):
     creation_date = FieldProperty(schema.datetime)
     modification_date = FieldProperty(schema.datetime)
     tags = FieldProperty(schema.Array(schema.String))
-    elements = RelationProperty('DatasetElementDAO')
-    comments = RelationProperty('DatasetCommentDAO')
-    tokens = RelationProperty('TokenDAO')
     fork_count = FieldProperty(schema.Int)
     forked_from_id = ForeignIdProperty('DatasetDAO')
-    forked_from = RelationProperty('DatasetDAO')
+
+
+    @property
+    def comments(self):
+        return GIterator(self.get_comments())
+
+    @property
+    def elements(self):
+        return GIterator(self.get_elements())
+
 
     def __init__(self, url_prefix, title, description, reference, tags=None, creation_date=now(), modification_date=now(),
                  fork_count=0, forked_from=None, forked_from_id=None):
         with lock:
-            previous_dset = DatasetDAO.query.get(url_prefix=url_prefix)
-            if previous_dset is not None:
+            if DatasetDAO.query.get(url_prefix=url_prefix) is not None:
                 raise Exception("Url prefix already taken.")
 
         if forked_from_id is None and forked_from is not None:
@@ -77,16 +95,6 @@ class DatasetDAO(MappedClass):
     def add_element(self, title, description, file_ref_id, http_ref=None, tags=None, addition_date=now(), modification_date=now()):
         return DatasetElementDAO(title, description, file_ref_id, http_ref, tags, addition_date, modification_date, dataset=self)
 
-    def delete(self):
-        url_prefix = self.url_prefix
-        for dataset_element in self.elements:
-            dataset_element.delete()
-
-        DatasetCommentDAO.query.remove({'dataset_id': self._id})
-        DatasetElementDAO.query.remove({'dataset_id': self._id})
-
-        DatasetDAO.query.remove({'_id': self._id})
-
     def update(self):
         return session.refresh(self)
 
@@ -97,8 +105,8 @@ class DatasetDAO(MappedClass):
                   "url_prefix", "fork_count"]
 
         response = {f: str(self[f]) for f in fields}
-        response['comments_count'] = len(self.comments)
-        response['elements_count'] = len(self.elements)
+        response['comments_count'] = self.comments.count()
+        response['elements_count'] = self.elements.count()
         response['tags'] = [t for t in self.tags]
         if self.forked_from is not None:
             response['fork_father'] = self.forked_from.url_prefix
@@ -119,6 +127,22 @@ class DatasetDAO(MappedClass):
 
         return DatasetElementDAO.query.find(query).sort("addition_date", 1)
 
+    def get_comments(self, options=None):
+        query = options
+        if query is None:
+            query = {}
+
+        query['dataset_id'] = self._id
+
+        return DatasetCommentDAO.query.find(query).sort("addition_date", 1)
+
+    def delete(self):
+        DatasetCommentDAO.query.remove({'dataset_id': self._id})
+        DatasetElementDAO.query.remove({'dataset_id': self._id})
+        DatasetElementCommentDAO.query.remove({'element_id': {'$in': [e._id for e in self.elements]}})
+        DatasetDAO.query.remove({'_id': self._id})
+
+
 class DatasetElementDAO(MappedClass):
 
     class __mongometa__:
@@ -133,9 +157,11 @@ class DatasetElementDAO(MappedClass):
     tags = FieldProperty(schema.Array(schema.String))
     addition_date = FieldProperty(schema.datetime)
     modification_date = FieldProperty(schema.datetime)
-    comments = RelationProperty('DatasetElementCommentDAO')
     dataset_id = ForeignIdProperty('DatasetDAO')
-    dataset = RelationProperty('DatasetDAO')
+
+    @property
+    def comments(self):
+        return GIterator(self.get_comments())
 
     def __init__(self, title, description, file_ref_id, http_ref=None, tags=None, addition_date=now(), modification_date=now(), dataset_id=None, dataset=None):
         if dataset_id is None and dataset is not None:
@@ -144,17 +170,21 @@ class DatasetElementDAO(MappedClass):
         kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__", "datasets"]}
         super().__init__(**kwargs)
 
+    def get_comments(self, options=None):
+        query = options
+        if query is None:
+            query = {}
+
+        query['element_id'] = self._id
+
+        return DatasetElementCommentDAO.query.find(query).sort("addition_date", 1)
+
     @classmethod
     def from_dict(cls, init_dict):
         return cls(**init_dict)
 
     def add_comment(self, author_name, author_link, content, addition_date=now()):
         return DatasetElementCommentDAO(author_name, author_link, content, addition_date, element=self)
-
-    def delete(self):
-        DatasetElementCommentDAO.query.remove({'element_id': self._id})
-        DatasetElementDAO.query.remove({'_id': self._id})
-        super().delete()
 
     def update(self):
         return session.refresh(self)
@@ -165,10 +195,14 @@ class DatasetElementDAO(MappedClass):
                   "http_ref"]
 
         response = {f: str(self[f]) for f in fields}
-        response['comments_count'] = len(self.comments)
+        response['comments_count'] = self.comments.count()
         response['has_content'] = self.file_ref_id is not None
         response['tags'] = [t for t in self.tags]
         return response
+
+    def delete(self):
+        DatasetElementCommentDAO.query.remove({'element_id': self._id})
+        DatasetElementDAO.query.remove({'_id': self._id})
 
 
 class DatasetCommentDAO(MappedClass):
@@ -183,7 +217,6 @@ class DatasetCommentDAO(MappedClass):
     content = FieldProperty(schema.String)
     addition_date = FieldProperty(schema.datetime)
     dataset_id = ForeignIdProperty('DatasetDAO')
-    dataset = RelationProperty('DatasetDAO')
 
     def __init__(self, author_name, author_link, content, addition_date=now(), dataset_id=None, dataset=None):
         if dataset_id is None and dataset is not None:
@@ -215,7 +248,6 @@ class DatasetElementCommentDAO(MappedClass):
     content = FieldProperty(schema.String)
     addition_date = FieldProperty(schema.datetime)
     element_id = ForeignIdProperty('DatasetElementDAO')
-    element = RelationProperty('DatasetElementDAO')
 
     def __init__(self, author_name, author_link, content, addition_date=now(), element_id=None, element=None):
         if element_id is None and element is not None:
@@ -233,7 +265,6 @@ class DatasetElementCommentDAO(MappedClass):
 
     def delete(self):
         DatasetElementCommentDAO.query.remove({'_id': self._id})
-        MappedClass.delete(self)
 
 from ming.odm import Mapper
 Mapper.compile_all()

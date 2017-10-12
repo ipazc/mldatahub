@@ -100,6 +100,7 @@ def control_access():
             ip_control.num_accesses += 1
 
             session.flush()
+            session.clear()
 
             return func(*args, **kwargs)
         return args_wrap

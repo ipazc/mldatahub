@@ -62,6 +62,7 @@ class TestTokenODM(unittest.TestCase):
 
         token1 = token1.link_datasets([dataset1, dataset2])
         token2 = token2.link_dataset(dataset2)
+        self.session.flush()
 
         self.assertEqual(len(token1.datasets), 2)
         self.assertEqual(len(token2.datasets), 1)
