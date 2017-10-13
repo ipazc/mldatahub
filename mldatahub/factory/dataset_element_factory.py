@@ -25,7 +25,7 @@ from flask_restful import abort
 from ming.odm.odmsession import ODMCursor
 from mldatahub.storage.generic_storage import GenericStorage
 from mldatahub.factory.dataset_factory import DatasetFactory
-from mldatahub.config.config import global_config
+from mldatahub.config.config import global_config, now
 from mldatahub.config.privileges import Privileges
 from mldatahub.odm.token_dao import TokenDAO
 from mldatahub.odm.dataset_dao import DatasetDAO
@@ -176,6 +176,8 @@ class DatasetElementFactory(object):
             for dataset_id in unlinked_datasets:
                 dataset_element.clone(dataset_id)
 
+        kwargs['modification_date'] = now()
+
         for k, v in kwargs.items():
             if k is not None and v is not None:
                 dataset_element[k] = v
@@ -241,9 +243,12 @@ class DatasetElementFactory(object):
                 for dataset_id in unlinked_datasets:
                     dataset_element.clone(dataset_id)
 
+            kwargs['modification_date'] = now()
+
             for k,v in elements_kwargs[original_dataset_element._id].items():
                 if k is not None and v is not None:
                     dataset_element[k] = v
+
             result_elements.append(dataset_element)
 
         if len(result_elements) == 0:
