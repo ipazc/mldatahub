@@ -235,6 +235,14 @@ class TestDatasetFactory(unittest.TestCase):
                                                  url_prefix="dataset", description="desc", reference="none",
                                                  tags=["d2", "d1"])
 
+        # Dataset can be forked omitting some options
+        forked_dataset2 = DatasetFactory(creator).fork_dataset(d.url_prefix, viewer,
+                                             url_prefix="dataset2")
+
+        self.assertEqual(forked_dataset2.title, d.title)
+        self.assertEqual(forked_dataset2.description, d.description)
+        self.assertEqual(forked_dataset2.tags, d.tags)
+        self.assertEqual(forked_dataset2.reference, d.reference)
 
     def test_dataset_retrieval(self):
         """

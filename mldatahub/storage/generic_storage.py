@@ -54,7 +54,7 @@ class GenericStorage(object):
     def put_file_content(self, content_bytes):
         pass
 
-    def put_files_content(self, content_bytes):
+    def put_files_contents(self, content_bytes):
         pass
 
     def delete_file(self, file_id):

@@ -100,15 +100,29 @@ class DatasetFactory(object):
         else:
             options = None
 
+        if 'title' not in kwargs or kwargs['title'] is None:
+            kwargs['title'] = target_dataset.title
+
+        if 'description' not in kwargs or kwargs['description'] is None:
+            kwargs['description'] = target_dataset.description
+
+        if 'reference' not in kwargs or kwargs['reference'] is None:
+            kwargs['reference'] = target_dataset.reference
+
+        if 'tags' not in kwargs or kwargs['tags'] is None:
+            kwargs['tags'] = target_dataset.tags
+
         fork_dataset = self.create_dataset(*args, **kwargs)
 
         target_dataset.fork_count += 1
         fork_dataset.forked_from = target_dataset
 
-        # Now we clone all the elements.
-
+        # Now we link all the elements to the forked dataset.
+        # When a modification or removal of any of the elements is proposed,
+        # the element should be cloned just an instant before.
         for element in target_dataset.get_elements(options):
-            fork_dataset.add_element(element.title, element.description, element.file_ref_id, element.http_ref, list(element.tags))
+            element.link_dataset(fork_dataset)
+            #fork_dataset.add_element(element.title, element.description, element.file_ref_id, element.http_ref, list(element.tags))
 
         self.session.flush()
 
