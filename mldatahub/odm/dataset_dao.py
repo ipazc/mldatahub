@@ -124,7 +124,7 @@ class DatasetDAO(MappedClass):
         if query is None:
             query = {}
 
-        query['dataset_id'] = self._id
+        query['dataset_id'] = {'$in': [self._id]}
 
         return DatasetElementDAO.query.find(query).sort("addition_date", 1)
 
@@ -158,7 +158,7 @@ class DatasetElementDAO(MappedClass):
     tags = FieldProperty(schema.Array(schema.String))
     addition_date = FieldProperty(schema.datetime)
     modification_date = FieldProperty(schema.datetime)
-    dataset_id = ForeignIdProperty('DatasetDAO')
+    dataset_id = ForeignIdProperty('DatasetDAO', uselist=True)
 
     @property
     def comments(self):
@@ -166,7 +166,7 @@ class DatasetElementDAO(MappedClass):
 
     def __init__(self, title, description, file_ref_id, http_ref=None, tags=None, addition_date=now(), modification_date=now(), dataset_id=None, dataset=None):
         if dataset_id is None and dataset is not None:
-            dataset_id = dataset._id
+            dataset_id = [dataset._id]
 
         kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__", "datasets"]}
         super().__init__(**kwargs)
@@ -183,6 +183,21 @@ class DatasetElementDAO(MappedClass):
     @classmethod
     def from_dict(cls, init_dict):
         return cls(**init_dict)
+
+    def unlink_dataset(self, dataset):
+        return self.unlink_datasets([dataset])
+
+    def unlink_datasets(self, datasets):
+        datasets_translated = [d._id for d in datasets]
+        self.dataset_id = [d for d in self.dataset_id if d not in datasets_translated]
+        return self
+
+    def link_dataset(self, dataset):
+        return self.link_datasets([dataset])
+
+    def link_datasets(self, datasets):
+        self.datasets_id += [d._id for d in datasets]
+        return self
 
     def add_comment(self, author_name, author_link, content, addition_date=now()):
         return DatasetElementCommentDAO(author_name, author_link, content, addition_date, element=self)

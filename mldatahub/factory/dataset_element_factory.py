@@ -295,16 +295,9 @@ class DatasetElementFactory(object):
         if not any([can_view_inner_element, can_view_others_elements]):
             abort(401)
 
-        if options is not None:
-            query = options
-        else:
-            query = {}
+        return self.dataset.get_elements(options).skip(page*global_config.get_page_size()).limit(global_config.get_page_size())
 
-        query["dataset_id"] = self.dataset._id
-
-        return DatasetElementDAO.query.find(query).sort("addition_date", 1).skip(page*global_config.get_page_size()).limit(global_config.get_page_size())
-
-    def get_specific_elements_info(self, elements_id:list) -> ODMCursor:
+    def get_specific_elements_info(self, elements_id:list) -> list:
         can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
         can_view_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
@@ -314,7 +307,10 @@ class DatasetElementFactory(object):
         if len(elements_id) > global_config.get_page_size():
             abort(416, message="Page size exceeded")
 
-        return DatasetElementDAO.query.find({"dataset_id": self.dataset._id, "_id": {"$in": elements_id }})
+        elements = {e._id: e for e in self.dataset.get_elements({"_id": {"$in": elements_id }})}
+
+        # Let's order the elements in the same way as the input.
+        return [elements[_id] for _id in elements_id]
 
     def get_element_thumbnail(self, element_id:ObjectId) -> bytes:
         # The get_element_info() method is going to make all the required checks for the retrieval of the thumbnail.

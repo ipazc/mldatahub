@@ -108,7 +108,7 @@ class TestDatasetElementFactory(unittest.TestCase):
         self.session.refresh(dataset)
 
         dataset = DatasetDAO.query.get(_id=dataset._id)
-        self.assertEqual(element.dataset_id, dataset._id)
+        self.assertIn(dataset._id, element.dataset_id)
         self.assertEqual(len(dataset.elements), 2)
 
         new_element = DatasetElementFactory(admin, dataset2).create_element(title="New element6",
