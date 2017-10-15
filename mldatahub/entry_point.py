@@ -125,6 +125,7 @@ def create_token(args):
     print("*****************************************")
     print("TOKEN:", token.token_gui)
 
+
 def build_app():
     from flask import Flask
     from flask_restful import Api
@@ -153,10 +154,12 @@ def build_app():
 
     return app
 
+
 def deploy():
     app = build_app()
     global_config.print_config()
     app.run(host=global_config.get_host(), port=global_config.get_port(), debug=False, threaded=True)
+
 
 def deploy_gc():
     def signal_handler(signal, frame):
@@ -168,6 +171,7 @@ def deploy_gc():
     signal.signal(signal.SIGINT, signal_handler)
     signal.pause()
     garbage_collector.stop()
+
 
 if __name__ == '__main__':
     main()

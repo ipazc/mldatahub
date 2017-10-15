@@ -24,6 +24,8 @@ import threading
 from threading import Thread
 from time import sleep
 
+import datetime
+
 from mldatahub.storage.generic_storage import GenericStorage
 from mldatahub.config.config import now, global_config
 from mldatahub.odm.dataset_dao import DatasetElementDAO
@@ -44,7 +46,7 @@ class GarbageCollector(object):
     lock = threading.Lock()
     do_stop = False
     storage = global_config.get_storage() # type: GenericStorage
-    last_tick = now()
+    last_tick = now() - datetime.timedelta(minutes=60)
 
     def __init__(self):
         self.thread = Thread(target=self.__thread_func, daemon=True)

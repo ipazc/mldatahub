@@ -66,7 +66,6 @@ class DatasetDAO(MappedClass):
     fork_count = FieldProperty(schema.Int)
     forked_from_id = ForeignIdProperty('DatasetDAO')
 
-
     @property
     def comments(self):
         return GIterator(self.get_comments())
