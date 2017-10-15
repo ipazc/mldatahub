@@ -25,7 +25,7 @@ global_config.set_session_uri("mongodb://localhost:27017/unittests")
 global_config.set_page_size(2)
 from mldatahub.factory.dataset_factory import DatasetFactory
 from mldatahub.factory.dataset_element_factory import DatasetElementFactory
-from werkzeug.exceptions import Unauthorized, BadRequest, RequestedRangeNotSatisfiable, NotFound
+from werkzeug.exceptions import Unauthorized, BadRequest, RequestedRangeNotSatisfiable, NotFound, Conflict
 from mldatahub.config.privileges import Privileges
 import unittest
 from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO
@@ -452,7 +452,7 @@ class TestDatasetElementFactory(unittest.TestCase):
         Factory can retrieve multiple elements at once by pages.
         """
 
-        editor = TokenDAO("normal user privileged with link", 1, 1, "user1",
+        editor = TokenDAO("normal user privileged with link", 1, 5, "user1",
                           privileges=Privileges.RO_WATCH_DATASET
                           )
 
@@ -475,6 +475,48 @@ class TestDatasetElementFactory(unittest.TestCase):
 
             for x in retrieved_elements:
                 self.assertIn(x.title, elements)
+
+    def test_dataset_elements_info_by_different_pages_size(self):
+        """
+        Factory can retrieve multiple elements with different page sizes.
+        """
+        initial_page_size = global_config.get_page_size()
+        global_config.set_page_size(10)
+
+        editor = TokenDAO("normal user privileged with link", 1, 5, "user1",
+                          privileges=Privileges.RO_WATCH_DATASET
+                          )
+
+        dataset = DatasetDAO("user1/dataset1", "example_dataset", "dataset for testing purposes", "none",
+                             tags=["example", "0"])
+
+        self.session.flush()
+
+        editor = editor.link_dataset(dataset)
+
+        elements = [DatasetElementDAO("example{}".format(x), "none", None, dataset=dataset).title for x in range(5)]
+
+        self.session.flush()
+
+        dataset = dataset.update()
+
+        # We need to know the order of the elements
+        ordered_elements = [l for l in DatasetElementFactory(editor, dataset).get_elements_info(page_size=len(elements))]
+
+        pages_size = [1, 2, 3, 4, 5]
+
+        for page_size in pages_size:
+            num_pages = len(elements) // page_size + int(len(elements) % page_size > 0)
+
+            for page in range(num_pages):
+                retrieved_elements = [l for l in DatasetElementFactory(editor, dataset).get_elements_info(page, page_size=page_size)]
+                for retrieved_element, ordered_element in zip(retrieved_elements, ordered_elements[page*page_size:(page+1)*page_size]):
+                    self.assertEqual(retrieved_element._id, ordered_element._id)
+
+        with self.assertRaises(Conflict):
+            retrieved_elements = DatasetElementFactory(editor, dataset).get_elements_info(page_size=global_config.get_page_size()+1)
+
+        global_config.set_page_size(initial_page_size)
 
     def test_dataset_specific_elements_info(self):
         """

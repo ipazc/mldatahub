@@ -191,10 +191,8 @@ class TestDatasetODM(unittest.TestCase):
         self.assertEqual(element.comments[2].author_name, "ivan")
 
         comment = element.comments[0]
-
-        #sleep(10)
         comment.delete()
-        #sleep(10)
+
         self.session.flush()
         self.session.clear()
 
@@ -249,7 +247,6 @@ class TestDatasetODM(unittest.TestCase):
         self.assertTrue(dataset.tags[0], "tag1")
         self.assertTrue(dataset.tags[1], {"tag2":"tag example"})
 
-
     def test_dataset_element_tags_allow_dicts(self):
         """
         Dataset elements tags allow dictionaries as elements.
@@ -265,7 +262,6 @@ class TestDatasetODM(unittest.TestCase):
 
         self.assertTrue(element.tags[0], "tag1")
         self.assertTrue(element.tags[1], {"tag2":"tag example"})
-
 
     def tearDown(self):
         DatasetDAO.query.remove()

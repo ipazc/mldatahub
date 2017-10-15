@@ -323,14 +323,20 @@ class DatasetElementFactory(object):
 
         return dataset_element
 
-    def get_elements_info(self, page=0, options=None) -> ODMCursor:
+    def get_elements_info(self, page=0, options=None, page_size=global_config.get_page_size()) -> ODMCursor:
         can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
         can_view_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
         if not any([can_view_inner_element, can_view_others_elements]):
             abort(401)
 
-        return self.dataset.get_elements(options).skip(page*global_config.get_page_size()).limit(global_config.get_page_size())
+        max_page_size = global_config.get_page_size()
+        min_page_size = 0
+
+        if min_page_size < page_size <= max_page_size:
+            return self.dataset.get_elements(options).skip(page*page_size).limit(page_size)
+        else:
+            abort(409, message="The page size can't be greater than {}".format(global_config.get_page_size()))
 
     def get_specific_elements_info(self, elements_id:list) -> list:
         can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)

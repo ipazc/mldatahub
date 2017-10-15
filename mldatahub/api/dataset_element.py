@@ -41,6 +41,7 @@ class DatasetElements(TokenizedResource):
         super().__init__()
         self.get_parser = reqparse.RequestParser()
         self.get_parser.add_argument("page", type=int, required=False, help="Page number to retrieve.", default=0)
+        self.get_parser.add_argument("page-size", type=int, required=False, help="Size of the page to retrieve.", default=global_config.get_page_size())
         self.get_parser.add_argument("elements", type=list, required=False, location="json", help="List of IDs to retrieve. Overrides the page attribute")
         self.get_parser.add_argument("options", type=dict, required=False, location="json", help="options string")
 
@@ -103,6 +104,12 @@ class DatasetElements(TokenizedResource):
 
         dataset = DatasetFactory(token).get_dataset(full_prefix)
 
+        try:
+            page_size = int(args['page-size'])
+        except ValueError as ex:
+            page_size = None
+            abort(400, message="The page-size must be an integer.")
+
         page = args['page']
 
         if 'options' in request.json:
@@ -110,7 +117,7 @@ class DatasetElements(TokenizedResource):
         else:
             options = None
 
-        elements_info = DatasetElementFactory(token, dataset).get_elements_info(page, options=options)
+        elements_info = DatasetElementFactory(token, dataset).get_elements_info(page, options=options, page_size=page_size)
 
         result = [element.serialize() for element in elements_info]
 
