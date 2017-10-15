@@ -96,6 +96,7 @@ class TestDatasetODM(unittest.TestCase):
         self.assertEqual(comment.dataset_id, dataset._id)
 
         dataset.delete()
+        self.session.flush()
         comment = DatasetCommentDAO.query.get(author_name="ivan")
         self.assertIsNone(comment)
 
@@ -126,6 +127,47 @@ class TestDatasetODM(unittest.TestCase):
 
         element = DatasetElementDAO.query.get(tags="tag1")
         self.assertIsNone(element)
+
+    def test_create_dataset_element_link_datasets_remove(self):
+        """
+        Dataset element clones itself correctly when it is linked to multiple datasets and removed.
+        :return:
+        """
+        dataset = DatasetDAO("ip/asd3", "example3", "for content", "unknown")
+        dataset2 = DatasetDAO("ip/asd4", "example4", "for content", "unknown")
+
+        element = dataset.add_element("ele1", "description of the element.", None, tags=["tag1", "tag2"])
+
+        self.session.flush()
+        self.assertEqual(len(dataset.elements), 1)
+        self.assertEqual(len(dataset2.elements), 0)
+        element.link_dataset(dataset2)
+
+        self.session.flush()
+        self.assertEqual(len(dataset.elements), 1)
+        self.assertEqual(len(dataset2.elements), 1)
+
+        self.assertEqual(dataset2.elements[0], element)
+
+        element.delete()
+        self.session.flush()
+        self.assertEqual(len(dataset.elements), 0)
+        self.assertEqual(len(dataset2.elements), 1)
+
+        self.assertNotEqual(element, dataset2.elements[0])
+        self.assertEqual(element.title, dataset2.elements[0].title)
+
+        element = dataset2.elements[0]
+        element.link_dataset(dataset)
+        self.session.flush()
+        self.assertEqual(len(dataset.elements), 1)
+        self.assertEqual(len(dataset2.elements), 1)
+
+        element.delete(owner_id=dataset._id)
+        self.session.flush()
+        self.assertEqual(len(dataset.elements), 0)
+        self.assertEqual(len(dataset2.elements), 1)
+        self.assertEqual(element.title, dataset2.elements[0].title)
 
     def test_create_dataset_element_add_remove_comment(self):
         """

@@ -25,7 +25,7 @@ from flask_restful import abort
 from ming.odm.odmsession import ODMCursor
 from mldatahub.storage.generic_storage import GenericStorage
 from mldatahub.factory.dataset_factory import DatasetFactory
-from mldatahub.config.config import global_config
+from mldatahub.config.config import global_config, now
 from mldatahub.config.privileges import Privileges
 from mldatahub.odm.token_dao import TokenDAO
 from mldatahub.odm.dataset_dao import DatasetDAO
@@ -163,6 +163,21 @@ class DatasetElementFactory(object):
         if not self.dataset.has_element(dataset_element) and not can_edit_others_elements:
             abort(401, message="Operation not allowed, element is not contained by the dataset")
 
+        if dataset_element.dataset_id[0] != self.dataset._id:
+            # This is a forked element, we must clone it to make the modifications
+            dataset_element.unlink_dataset(self.dataset)
+            dataset_element = dataset_element.clone(self.dataset._id)
+
+        elif len(dataset_element.dataset_id) > 1:
+            #  This is the parent dataset, that have been forked. We need to clone the element for each forked dataset,
+            # as it is not forked from this one anymore because of the change.
+            unlinked_datasets = dataset_element.dataset_id[1:]
+            dataset_element.unlink_datasets(unlinked_datasets)
+            for dataset_id in unlinked_datasets:
+                dataset_element.clone(dataset_id)
+
+        kwargs['modification_date'] = now()
+
         for k, v in kwargs.items():
             if k is not None and v is not None:
                 dataset_element[k] = v
@@ -171,7 +186,7 @@ class DatasetElementFactory(object):
 
         return dataset_element
 
-    def edit_elements(self, elements_kwargs) -> ODMCursor:
+    def edit_elements(self, elements_kwargs) -> list:
         can_edit_inner_element = bool(self.token.privileges & Privileges.EDIT_ELEMENTS)
         can_edit_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
@@ -206,23 +221,42 @@ class DatasetElementFactory(object):
 
         files_refs = {element_id: file for element_id, file in zip(elements_ids, self.storage.put_files_contents(elements_content))}
 
+        result_elements = []
         for dataset_element in dataset_elements:
+            original_dataset_element = dataset_element
+
             kwargs = elements_kwargs[dataset_element._id]
 
             if 'content' in kwargs:
                 # New content to append here...
                 kwargs['file_ref_id'] = files_refs[dataset_element._id]
 
-            for k,v in elements_kwargs[dataset_element._id].items():
+            if dataset_element.dataset_id[0] != self.dataset._id:
+                # This is a forked element, we must clone it to make the modifications
+                dataset_element.unlink_dataset(self.dataset)
+                dataset_element = dataset_element.clone(self.dataset._id)
+            elif len(dataset_element.dataset_id) > 1:
+                #  This is the parent dataset, that have been forked. We need to clone the element for each forked dataset,
+                # as it is not forked from this one anymore because of the change.
+                unlinked_datasets = dataset_element.dataset_id[1:]
+                dataset_element.unlink_datasets(unlinked_datasets)
+                for dataset_id in unlinked_datasets:
+                    dataset_element.clone(dataset_id)
+
+            kwargs['modification_date'] = now()
+
+            for k,v in elements_kwargs[original_dataset_element._id].items():
                 if k is not None and v is not None:
                     dataset_element[k] = v
 
-        if len(dataset_elements) == 0:
+            result_elements.append(dataset_element)
+
+        if len(result_elements) == 0:
             abort(404, message="Elements not found.")
 
         self.session.flush()
 
-        return dataset_elements
+        return result_elements
 
     def clone_element(self, element_id:ObjectId, dest_dataset_url_prefix:str) -> DatasetElementDAO:
         can_edit_inner_element = bool(self.token.privileges & (Privileges.RO_WATCH_DATASET +
@@ -242,11 +276,11 @@ class DatasetElementFactory(object):
 
         element = self.get_element_info(element_id)
 
-        new_element = dataset.add_element(element.title, element.description, element.file_ref_id, element.http_ref, list(element.tags))
+        element.link_dataset(dataset)
 
         self.session.flush()
 
-        return new_element
+        return element
 
     def clone_elements(self, elements_ids: list, dest_dataset_url_prefix: str) -> list:
         can_edit_inner_element = bool(self.token.privileges & (Privileges.RO_WATCH_DATASET +
@@ -265,11 +299,12 @@ class DatasetElementFactory(object):
 
         elements = self.get_specific_elements_info(elements_ids)
 
-        new_elements = [dataset.add_element(element.title, element.description, element.file_ref_id, element.http_ref, list(element.tags)) for element in elements]
+        for element in elements:
+            element.link_dataset(dataset)
 
         self.session.flush()
 
-        return new_elements
+        return elements
 
     def get_element_info(self, element_id:ObjectId) -> DatasetElementDAO:
         can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
@@ -295,16 +330,9 @@ class DatasetElementFactory(object):
         if not any([can_view_inner_element, can_view_others_elements]):
             abort(401)
 
-        if options is not None:
-            query = options
-        else:
-            query = {}
+        return self.dataset.get_elements(options).skip(page*global_config.get_page_size()).limit(global_config.get_page_size())
 
-        query["dataset_id"] = self.dataset._id
-
-        return DatasetElementDAO.query.find(query).sort("addition_date", 1).skip(page*global_config.get_page_size()).limit(global_config.get_page_size())
-
-    def get_specific_elements_info(self, elements_id:list) -> ODMCursor:
+    def get_specific_elements_info(self, elements_id:list) -> list:
         can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
         can_view_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
@@ -314,7 +342,10 @@ class DatasetElementFactory(object):
         if len(elements_id) > global_config.get_page_size():
             abort(416, message="Page size exceeded")
 
-        return DatasetElementDAO.query.find({"dataset_id": self.dataset._id, "_id": {"$in": elements_id }})
+        elements = {e._id: e for e in self.dataset.get_elements({"_id": {"$in": elements_id }})}
+
+        # Let's order the elements in the same way as the input.
+        return [elements[_id] for _id in elements_id]
 
     def get_element_thumbnail(self, element_id:ObjectId) -> bytes:
         # The get_element_info() method is going to make all the required checks for the retrieval of the thumbnail.
@@ -373,7 +404,7 @@ class DatasetElementFactory(object):
         if not self.dataset.has_element(dataset_element) and not can_destroy_others_elements:
             abort(401)
 
-        dataset_element.delete()
+        dataset_element.delete(owner_id=self.dataset._id)
 
         self.session.flush()
         self.dataset = self.session.refresh(self.dataset)
@@ -401,9 +432,8 @@ class DatasetElementFactory(object):
             lost_elements = [element_id for element_id in elements_ids if element_id not in retrieved_elements_ids]
             abort(404, message="The following elements couldn't be deleted (they don't exist?): {}".format(lost_elements))
 
-
         for d in dataset_elements:
-            d.delete()
+            d.delete(owner_id=self.dataset._id)
 
         self.session.flush()
 

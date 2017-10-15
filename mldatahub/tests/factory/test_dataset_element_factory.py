@@ -23,11 +23,13 @@
 from mldatahub.config.config import global_config
 global_config.set_session_uri("mongodb://localhost:27017/unittests")
 global_config.set_page_size(2)
+from mldatahub.factory.dataset_factory import DatasetFactory
 from mldatahub.factory.dataset_element_factory import DatasetElementFactory
 from werkzeug.exceptions import Unauthorized, BadRequest, RequestedRangeNotSatisfiable, NotFound
 from mldatahub.config.privileges import Privileges
 import unittest
 from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO
+from mldatahub.odm.file_dao import FileDAO
 from mldatahub.odm.token_dao import TokenDAO
 
 
@@ -43,6 +45,7 @@ class TestDatasetElementFactory(unittest.TestCase):
         DatasetCommentDAO.query.remove()
         DatasetElementDAO.query.remove()
         DatasetElementCommentDAO.query.remove()
+        FileDAO.query.remove()
         TokenDAO.query.remove()
 
     def test_dataset_element_creation(self):
@@ -108,7 +111,7 @@ class TestDatasetElementFactory(unittest.TestCase):
         self.session.refresh(dataset)
 
         dataset = DatasetDAO.query.get(_id=dataset._id)
-        self.assertEqual(element.dataset_id, dataset._id)
+        self.assertIn(dataset._id, element.dataset_id)
         self.assertEqual(len(dataset.elements), 2)
 
         new_element = DatasetElementFactory(admin, dataset2).create_element(title="New element6",
@@ -152,7 +155,6 @@ class TestDatasetElementFactory(unittest.TestCase):
         dataset = dataset.update()
 
         self.assertEqual(len(dataset.elements), 3)
-
 
     def test_dataset_element_removal(self):
         """
@@ -703,6 +705,7 @@ class TestDatasetElementFactory(unittest.TestCase):
             new_element = DatasetElementFactory(editor, dataset).clone_element(element._id, dataset2.url_prefix)
 
         editor = editor.link_dataset(dataset2)
+        self.assertEqual(len(element.dataset_id), 1)
         new_element = DatasetElementFactory(editor, dataset).clone_element(element._id, dataset2.url_prefix)
 
         dataset2 = dataset2.update()
@@ -713,7 +716,9 @@ class TestDatasetElementFactory(unittest.TestCase):
         self.assertEqual(new_element.title, element.title)
         self.assertEqual(new_element.description, element.description)
         self.assertEqual(new_element.tags, element.tags)
-        self.assertNotEqual(new_element._id, element._id)
+        self.assertEqual(new_element._id, element._id)
+        self.assertEqual(len(new_element.dataset_id), 2)
+        self.assertEqual(len(element.dataset_id), 2)
 
         with self.assertRaises(Unauthorized) as ex:
             new_element = DatasetElementFactory(editor, dataset).clone_element(element2._id, dataset2.url_prefix)
@@ -761,12 +766,137 @@ class TestDatasetElementFactory(unittest.TestCase):
         self.assertEqual(len(dataset.elements), 3)
         self.assertEqual(len(dataset2.elements), 2)
 
+    def test_dataset_fork_element_modification(self):
+        """
+        Elements modified from a forked dataset do not affect the main dataset.
+        :return:
+        """
+        editor = TokenDAO("normal user privileged with link", 100, 200, "user1",
+                     privileges=Privileges.RO_WATCH_DATASET + Privileges.CREATE_DATASET + Privileges.EDIT_DATASET +
+                                Privileges.ADD_ELEMENTS + Privileges.EDIT_ELEMENTS + Privileges.DESTROY_ELEMENTS
+                 )
+
+        main_dataset = DatasetFactory(editor).create_dataset(url_prefix="foobar", title="foo", description="bar",
+                                                             reference="none", tags=["a"])
+
+        editor = editor.link_dataset(main_dataset)
+
+        elements_proto = [{
+            'title': 't{}'.format(i),
+            'description': 'desc{}'.format(i),
+            'http_ref': 'none',
+            'tags': ['none'],
+            'content': "content{}".format(i).encode()
+        } for i in range(4)]
+
+        elements = [DatasetElementFactory(editor, main_dataset).create_element(**element_proto) for element_proto in elements_proto]
+        self.session.flush()
+
+        self.assertEqual(len(elements), len(main_dataset.elements))
+        forked_dataset = DatasetFactory(editor).fork_dataset(main_dataset.url_prefix, editor, url_prefix="foo")
+        editor.link_dataset(forked_dataset)
+        self.session.flush()
+        self.assertEqual(len(forked_dataset.elements), len(main_dataset.elements))
+        DatasetElementFactory(editor, forked_dataset).destroy_element(forked_dataset.elements[0]._id)
+
+        self.session.flush()
+        self.assertEqual(len(forked_dataset.elements), len(main_dataset.elements)-1)
+        self.assertEqual(forked_dataset.elements[0].title, "t1")
+
+        DatasetElementFactory(editor, main_dataset).destroy_element(main_dataset.elements[1]._id)
+
+        self.session.flush()
+        self.assertEqual(len(forked_dataset.elements), len(main_dataset.elements))
+        self.assertEqual(forked_dataset.elements[0].title, "t1")
+        self.assertEqual(forked_dataset.elements[1].title, "t2")
+        self.assertEqual(forked_dataset.elements[2].title, "t3")
+        self.assertEqual(main_dataset.elements[0].title, "t0")
+        self.assertEqual(main_dataset.elements[1].title, "t2")
+        self.assertEqual(main_dataset.elements[2].title, "t3")
+
+        DatasetElementFactory(editor, forked_dataset).edit_element(main_dataset.elements[2]._id, title='tc2')
+        self.session.flush()
+
+        self.assertEqual(main_dataset.elements[2].title, "t3")
+        self.assertEqual(forked_dataset.elements[2].title, "tc2")
+
+        DatasetElementFactory(editor, main_dataset).edit_element(main_dataset.elements[1]._id, title='tc')
+        self.session.flush()
+
+        self.assertEqual(main_dataset.elements[1].title, "tc")
+        self.assertEqual(forked_dataset.elements[1].title, "t2")
+
+        main_dataset = DatasetFactory(editor).create_dataset(url_prefix="foobar2", title="foo", description="bar",
+                                                             reference="none", tags=["a"])
+
+        editor.link_dataset(main_dataset)
+        self.session.flush()
+
+        elements_proto = [{
+            'title': 't{}'.format(i),
+            'description': 'desc{}'.format(i),
+            'http_ref': 'none',
+            'tags': ['none'],
+            'content': "content{}".format(i).encode()
+        } for i in range(4)]
+
+        elements = [DatasetElementFactory(editor, main_dataset).create_element(**element_proto) for element_proto in elements_proto]
+        self.session.flush()
+
+        forked_dataset2 = DatasetFactory(editor).fork_dataset(main_dataset.url_prefix, editor, url_prefix="bar")
+        self.session.flush()
+        editor.link_dataset(forked_dataset2)
+        self.session.flush()
+        mod_proto = {
+            main_dataset.elements[0]._id: dict(title="t3"),
+            main_dataset.elements[1]._id: dict(title="t3_2"),
+        }
+
+        self.assertEqual(forked_dataset2.elements[0]._id, main_dataset.elements[0]._id)
+        self.assertEqual(forked_dataset2.elements[1]._id, main_dataset.elements[1]._id)
+        self.assertEqual(forked_dataset2.elements[2]._id, main_dataset.elements[2]._id)
+        self.assertEqual(forked_dataset2.elements[3]._id, main_dataset.elements[3]._id)
+
+        DatasetElementFactory(editor, main_dataset).edit_elements(mod_proto)
+        self.session.flush()
+        self.assertEqual(forked_dataset2.elements[0].title, "t0")
+        self.assertEqual(forked_dataset2.elements[1].title, "t1")
+        self.assertEqual(forked_dataset2.elements[2].title, "t2")
+        self.assertEqual(forked_dataset2.elements[3].title, "t3")
+        self.assertEqual(main_dataset.elements[0].title, "t3")
+        self.assertEqual(main_dataset.elements[1].title, "t3_2")
+        self.assertEqual(main_dataset.elements[2].title, "t2")
+        self.assertEqual(main_dataset.elements[3].title, "t3")
+
+        self.assertNotEqual(forked_dataset2.elements[0]._id, main_dataset.elements[0]._id)
+        self.assertNotEqual(forked_dataset2.elements[1]._id, main_dataset.elements[1]._id)
+        self.assertEqual(forked_dataset2.elements[2]._id, main_dataset.elements[2]._id)
+        self.assertEqual(forked_dataset2.elements[3]._id, main_dataset.elements[3]._id)
+
+        mod_proto = {
+            forked_dataset2.elements[2]._id: dict(title="t4"),
+            forked_dataset2.elements[3]._id: dict(title="t4_2"),
+        }
+        DatasetElementFactory(editor, forked_dataset2).edit_elements(mod_proto)
+
+        self.assertNotEqual(forked_dataset2.elements[0]._id, main_dataset.elements[0]._id)
+        self.assertNotEqual(forked_dataset2.elements[1]._id, main_dataset.elements[1]._id)
+        self.assertNotEqual(forked_dataset2.elements[2]._id, main_dataset.elements[2]._id)
+        self.assertNotEqual(forked_dataset2.elements[3]._id, main_dataset.elements[3]._id)
+        self.assertEqual(forked_dataset2.elements[2].title, "t4")
+        self.assertEqual(forked_dataset2.elements[3].title, "t4_2")
+        self.assertEqual(main_dataset.elements[2].title, "t2")
+        self.assertEqual(main_dataset.elements[3].title, "t3")
+
+
+
     def tearDown(self):
         DatasetDAO.query.remove()
         DatasetCommentDAO.query.remove()
         DatasetElementDAO.query.remove()
         DatasetElementCommentDAO.query.remove()
         TokenDAO.query.remove()
+        FileDAO.query.remove()
 
     @classmethod
     def tearDownClass(cls):

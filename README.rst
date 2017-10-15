@@ -13,12 +13,13 @@ This is still a work in progress. It is expected to achieve a Proof Of Concept d
 NOTES
 =====
 
-On mongo, it is required to set indexes on `element.addition_date` and on `file.sha256`:
+On mongo, it is required to set indexes on `element.addition_date`, `element.dataset_id` and on `file.sha256`:
 
 
 .. code:: javascript
 
     db.element.create_index({'addition_date': 1})
+    db.element.create_index({'dataset_id': 1})
     db.file.create_index({'sha256': 1})
 
 

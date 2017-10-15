@@ -21,6 +21,7 @@
 # MA  02110-1301, USA.
 
 from multiprocessing import Lock
+from bson import ObjectId
 from mldatahub.config.config import global_config, now
 from mldatahub.odm.file_dao import FileDAO
 from ming import schema
@@ -106,8 +107,8 @@ class DatasetDAO(MappedClass):
                   "url_prefix", "fork_count"]
 
         response = {f: str(self[f]) for f in fields}
-        response['comments_count'] = self.comments.count()
-        response['elements_count'] = self.elements.count()
+        response['comments_count'] = len(self.comments)
+        response['elements_count'] = len(self.elements)
         response['tags'] = [t for t in self.tags]
         if self.forked_from is not None:
             response['fork_father'] = self.forked_from.url_prefix
@@ -124,7 +125,7 @@ class DatasetDAO(MappedClass):
         if query is None:
             query = {}
 
-        query['dataset_id'] = self._id
+        query['dataset_id'] = {'$in': [self._id]}
 
         return DatasetElementDAO.query.find(query).sort("addition_date", 1)
 
@@ -139,8 +140,14 @@ class DatasetDAO(MappedClass):
 
     def delete(self):
         DatasetCommentDAO.query.remove({'dataset_id': self._id})
-        DatasetElementDAO.query.remove({'dataset_id': self._id})
+        DatasetElementDAO.query.remove({'dataset_id.0': self._id})
         DatasetElementCommentDAO.query.remove({'element_id': {'$in': [e._id for e in self.elements]}})
+
+        # Now those elements that were linked to this dataset (but not owned by the dataset) must be unlinked
+        elements = DatasetElementDAO.query.find({'dataset_id': self._id})
+        for element in elements:
+            element.unlink_dataset(self)
+
         DatasetDAO.query.remove({'_id': self._id})
 
 
@@ -158,15 +165,21 @@ class DatasetElementDAO(MappedClass):
     tags = FieldProperty(schema.Array(schema.Anything))
     addition_date = FieldProperty(schema.datetime)
     modification_date = FieldProperty(schema.datetime)
-    dataset_id = ForeignIdProperty('DatasetDAO')
+    dataset_id = ForeignIdProperty('DatasetDAO', uselist=True)
 
     @property
     def comments(self):
         return GIterator(self.get_comments())
 
-    def __init__(self, title, description, file_ref_id, http_ref=None, tags=None, addition_date=now(), modification_date=now(), dataset_id=None, dataset=None):
+    def __init__(self, title, description, file_ref_id, http_ref=None, tags=None, addition_date=None, modification_date=None, dataset_id=None, dataset=None):
+        if addition_date is None:
+            addition_date = now()
+
+        if modification_date is None:
+            modification_date = now()
+
         if dataset_id is None and dataset is not None:
-            dataset_id = dataset._id
+            dataset_id = [dataset._id]
 
         kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__", "datasets"]}
         super().__init__(**kwargs)
@@ -184,6 +197,29 @@ class DatasetElementDAO(MappedClass):
     def from_dict(cls, init_dict):
         return cls(**init_dict)
 
+    def unlink_dataset(self, dataset):
+        return self.unlink_datasets([dataset])
+
+    def unlink_datasets(self, datasets):
+        if len(datasets) > 0 and isinstance(datasets[0], ObjectId):
+            datasets_translated = datasets
+        else:
+            datasets_translated = [d._id for d in datasets]
+
+        self.dataset_id = [d for d in self.dataset_id if d not in datasets_translated]
+        return self
+
+    def link_dataset(self, dataset):
+        return self.link_datasets([dataset])
+
+    def link_datasets(self, datasets):
+        if len(datasets) > 0 and isinstance(datasets[0], ObjectId):
+            datasets_translated = datasets
+        else:
+            datasets_translated = [d._id for d in datasets]
+        self.dataset_id += datasets_translated
+        return self
+
     def add_comment(self, author_name, author_link, content, addition_date=now()):
         return DatasetElementCommentDAO(author_name, author_link, content, addition_date, element=self)
 
@@ -196,15 +232,36 @@ class DatasetElementDAO(MappedClass):
                   "http_ref"]
 
         response = {f: str(self[f]) for f in fields}
-        response['comments_count'] = self.comments.count()
+        response['comments_count'] = len(self.comments)
         response['has_content'] = self.file_ref_id is not None
         response['tags'] = [t for t in self.tags]
         return response
 
-    def delete(self):
-        DatasetElementCommentDAO.query.remove({'element_id': self._id})
-        DatasetElementDAO.query.remove({'_id': self._id})
+    def clone(self, dataset_id=None):
+        if dataset_id is None:
+            dataset_id = self._id
 
+        return DatasetElementDAO(title=self.title, description=self.description, file_ref_id=self.file_ref_id,
+                                 http_ref=self.http_ref, tags=self.tags, addition_date=self.addition_date,
+                                 modification_date=self.modification_date, dataset_id=[dataset_id])
+
+    def delete(self, owner_id:ObjectId=None):
+        try:
+            if owner_id is None:
+                owner_id = self.dataset_id[0]
+
+            if self.dataset_id.index(owner_id) > 0:
+                self.dataset_id = [d for d in self.dataset_id if d != owner_id]
+            else:
+                for dataset_id in self.dataset_id[1:]:
+                    self.clone(dataset_id)
+
+                DatasetElementCommentDAO.query.remove({'element_id': self._id})
+                DatasetElementDAO.query.remove({'_id': self._id})
+
+        except Exception as ex:
+            DatasetElementCommentDAO.query.remove({'element_id': self._id})
+            DatasetElementDAO.query.remove({'_id': self._id})
 
 class DatasetCommentDAO(MappedClass):
 
