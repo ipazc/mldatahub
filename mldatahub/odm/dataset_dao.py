@@ -61,6 +61,7 @@ class DatasetDAO(MappedClass):
     reference = FieldProperty(schema.String)
     creation_date = FieldProperty(schema.datetime)
     modification_date = FieldProperty(schema.datetime)
+    size = FieldProperty(schema.Int)
     tags = FieldProperty(schema.Array(schema.Anything))
     fork_count = FieldProperty(schema.Int)
     forked_from_id = ForeignIdProperty('DatasetDAO')
@@ -83,7 +84,7 @@ class DatasetDAO(MappedClass):
 
         if forked_from_id is None and forked_from is not None:
             forked_from_id = forked_from._id
-
+        size = 0
         kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__"]}
         super().__init__(**kwargs)
 
@@ -104,7 +105,7 @@ class DatasetDAO(MappedClass):
 
         fields = ["title", "description", "reference",
                   "creation_date", "modification_date",
-                  "url_prefix", "fork_count"]
+                  "url_prefix", "fork_count", "size"]
 
         response = {f: str(self[f]) for f in fields}
         response['comments_count'] = len(self.comments)
