@@ -324,59 +324,13 @@ class DatasetForker(TokenizedResource):
 
         return result
 
+
 class DatasetSize(TokenizedResource):
 
     def __init__(self):
         super().__init__()
-        self.post_parser = reqparse.RequestParser()
+        self.get_parser = reqparse.RequestParser()
         self.session = global_config.get_session()
-        arguments = {
-            "url_prefix":
-                {
-                    "type": str,
-                    "required": True,
-                    "help": "URL prefix for this dataset. Characters \"{}\" not allowed".format(DatasetFactory.illegal_chars),
-                    "location": "json"
-                },
-            "title":
-                {
-                    "type": str,
-                    "required": True,
-                    "help": "Title for the dataset.",
-                    "location": "json"
-                },
-            "description":
-                {
-                    "type": str,
-                    "required": True,
-                    "help": "Description for the dataset.",
-                    "location": "json"
-                },
-            "reference":
-                {
-                    "type": str,
-                    "required": True,
-                    "help": "Reference data (perhaps a Bibtex in string format?)",
-                    "location": "json"
-                },
-            "tags":
-                {
-                    "type": list,
-                    "required": False,
-                    "help": "Tags for the dataset (ease the searches for this dataset).",
-                    "location": "json"
-                },
-            "options":
-                {
-                    "type": dict,
-                    "required": False,
-                    "location": "json",
-                    "help": "options string"
-                }
-        }
-
-        for argument, kwargs in arguments.items():
-            self.post_parser.add_argument(argument, **kwargs)
 
     @control_access()
     def get(self, token_prefix, dataset_prefix):
@@ -389,6 +343,7 @@ class DatasetSize(TokenizedResource):
         full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
-        result = dataset.serialize()
 
-        return result, 200
+        total_size = global_config.get_storage().get_files_size([l.file_ref_id for l in dataset.elements])
+
+        return total_size, 200

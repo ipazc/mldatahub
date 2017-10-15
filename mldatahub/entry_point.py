@@ -125,10 +125,9 @@ def create_token(args):
 def build_app():
     from flask import Flask
     from flask_restful import Api
-    from mldatahub.api.dataset import Datasets, Dataset, DatasetForker
+    from mldatahub.api.dataset import Datasets, Dataset, DatasetForker, DatasetSize
     from mldatahub.api.dataset_element import DatasetElements, DatasetElement, DatasetElementContent, \
-        DatasetElementsBundle, \
-        DatasetElementContentBundle
+        DatasetElementsBundle, DatasetElementContentBundle
     from mldatahub.api.server import Server
     from mldatahub.api.token import Tokens, Token, TokenLinker
 
@@ -147,6 +146,7 @@ def build_app():
     api.add_resource(DatasetElement, '/datasets/<token_prefix>/<dataset_prefix>/elements/<element_id>')
     api.add_resource(DatasetElementContent, '/datasets/<token_prefix>/<dataset_prefix>/elements/<element_id>/content')
     api.add_resource(DatasetElementContentBundle, '/datasets/<token_prefix>/<dataset_prefix>/elements/content')
+    api.add_resource(DatasetSize, '/datasets/<token_prefix>/<dataset_prefix>/size')
 
     return app
 
