@@ -82,6 +82,11 @@ class DatasetDAO(MappedClass):
 
         return DatasetDAO.query.get(_id=self.forked_from_id)
 
+    @forked_from.setter
+    def forked_from(self, dataset):
+        if dataset is not None:
+            self.forked_from_id = dataset._id
+
     def __init__(self, url_prefix, title, description, reference, tags=None, creation_date=now(), modification_date=now(),
                  fork_count=0, forked_from=None, forked_from_id=None):
         with lock:
