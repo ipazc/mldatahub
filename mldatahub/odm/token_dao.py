@@ -56,7 +56,11 @@ class TokenDAO(MappedClass):
 
     class DIterator(object):
         def __init__(self, dataset_list):
-            self.cursor = DatasetDAO.query.find({'_id': {'$in': list(dataset_list)}})
+            try:
+                self.cursor = DatasetDAO.query.find({'_id': {'$in': list(dataset_list)}})
+            except Exception as ex:
+                print(ex)
+                exit(0)
 
         def __iter__(self):
             return self.cursor

@@ -55,8 +55,6 @@ class GlobalConfig(object):
             with open("/etc/mldatahub/config.json") as f:
                 self.config_values = json.load(f)
 
-                self.config_values['local_storage_uri'] = self.config_values['local_storage_uri'].replace("$HOME", HOME)
-
         except FileNotFoundError as ex:
             print("Config file not found. Running on default values.")
 

@@ -75,6 +75,12 @@ class DatasetDAO(MappedClass):
     def elements(self):
         return GIterator(self.get_elements())
 
+    @property
+    def forked_from(self):
+        if self.forked_from_id is None:
+            return None
+
+        return DatasetDAO.query.get(_id=self.forked_from_id)
 
     def __init__(self, url_prefix, title, description, reference, tags=None, creation_date=now(), modification_date=now(),
                  fork_count=0, forked_from=None, forked_from_id=None):
@@ -84,8 +90,9 @@ class DatasetDAO(MappedClass):
 
         if forked_from_id is None and forked_from is not None:
             forked_from_id = forked_from._id
+
         size = 0
-        kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__"]}
+        kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__", "forked_from"]}
         super().__init__(**kwargs)
 
     @classmethod
@@ -110,9 +117,10 @@ class DatasetDAO(MappedClass):
         response = {f: str(self[f]) for f in fields}
         response['comments_count'] = len(self.comments)
         response['elements_count'] = len(self.elements)
-        response['tags'] = [t for t in self.tags]
+        response['tags'] = list(self.tags)
+
         if self.forked_from is not None:
-            response['fork_father'] = self.forked_from.url_prefix
+            response['fork_father'] =  self.forked_from.url_prefix
         else:
             response['fork_father'] = None
 

@@ -34,7 +34,7 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-v", "--version", action="store_true")
     group.add_argument("-d", "--deploy", action="store_true", help="Deploys the ML Data Hub using the /etc/mldatahub/config.json options.")
-    group.add_argument("-p", "--purge-dataset", action="store_true", dest="purge_dataset", help="Purges the dataset and leaves it in a clean state.")
+    group.add_argument("-p", "--purge-database", action="store_true", dest="purge_database", help="Purges the database and leaves it in a clean state.")
     group.add_argument("-c", "--create-token", action="store_true", dest="create_token", help="Creates a standard privileged token (create datasets).")
     group.add_argument("-g", "--garbage-collector", action="store_true", dest="garbage_collector", help="Instances the Garbage Collector for freed files.")
 
@@ -56,8 +56,8 @@ def main():
         print(mldatahub.__version__)
     elif args.deploy:
         deploy()
-    elif args.purge_dataset:
-        purge_dataset()
+    elif args.purge_database:
+        purge_database()
     elif args.create_token:
         create_token(sys.argv[index+1:])
     elif args.garbage_collector:
@@ -66,9 +66,10 @@ def main():
         parser.print_help()
 
 
-def purge_dataset():
+def purge_database():
     from mldatahub.odm.dataset_dao import DatasetDAO, DatasetCommentDAO, DatasetElementDAO, DatasetElementCommentDAO
     from mldatahub.odm.restapi_dao import RestAPIDAO
+    from mldatahub.odm.file_dao import FileDAO
     from mldatahub.odm.token_dao import TokenDAO
     TokenDAO.query.remove()
     print("Purging tokens...")
@@ -80,6 +81,8 @@ def purge_dataset():
     print("Purging datasets' elements...")
     DatasetElementCommentDAO.query.remove()
     print("Purging datasets' elements comments...")
+    FileDAO.query.remove()
+    print("Purging files...")
     RestAPIDAO.query.remove()
     print("Purging accesses records...")
     print("Finished.")
