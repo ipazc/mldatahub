@@ -44,17 +44,23 @@ class DatasetFactory(object):
         illegal_chars = self.illegal_chars
 
         if not any([can_create_inner_dataset, can_create_others_dataset]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to create dataset.")
 
         if not can_create_others_dataset and self._dataset_limit_reached():
-            abort(401)
+            abort(401, message="Your token has reached the limit in the creation of datasets.")
 
         try:
             url_prefix = kwargs["url_prefix"]
             del kwargs["url_prefix"]
         except KeyError as ex:
             url_prefix = ""
-            abort(400)
+            abort(400, message="An URL-Prefix is required for the creation of the dataset.")
+
+        if 'elements' in kwargs:
+            abort(400, message="There is a field not allowed in the create request.")
+
+        if 'comments' in kwargs:
+            abort(400, message="There is a field not allowed in the create request.")
 
         # Limit arguments.
         kwargs['fork_count'] = 0
@@ -69,7 +75,7 @@ class DatasetFactory(object):
             illegal_chars = illegal_chars[1:] # "/" is allowed for admin
 
         if any([illegal_char in url_prefix for illegal_char in illegal_chars]):
-            abort(400)
+            abort(400, message="The following chars are not allowed in the url-prefix: {}".format(illegal_chars))
 
         if "/" not in url_prefix:
             url_prefix="{}/{}".format(self.token.url_prefix, url_prefix)
@@ -137,7 +143,7 @@ class DatasetFactory(object):
         illegal_chars = self.illegal_chars
 
         if not any([can_edit_inner_dataset, can_edit_others_dataset]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to edit datasets.")
 
         try:
             url_prefix = kwargs["url_prefix"]
@@ -146,7 +152,7 @@ class DatasetFactory(object):
                 illegal_chars = illegal_chars[1:] # "/" is allowed for admin
 
             if any([illegal_char in url_prefix for illegal_char in illegal_chars]):
-                abort(400)
+                abort(400, message="The following chars are not allowed in the url-prefix: {}".format(illegal_chars))
 
             if "/" not in url_prefix:
                 url_prefix="{}/{}".format(self.token.url_prefix, url_prefix)
@@ -157,10 +163,10 @@ class DatasetFactory(object):
             pass
 
         if 'elements' in kwargs:
-            abort(400)
+            abort(400, message="There is a field not allowed in the edit request.")
 
         if 'comments' in kwargs:
-            abort(400)
+            abort(400, message="There is a field not allowed in the edit request.")
 
         edit_dataset = DatasetDAO.query.get(url_prefix=edit_url_prefix)
 
@@ -193,7 +199,7 @@ class DatasetFactory(object):
         can_view_others_dataset = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
         if not any([can_view_inner_dataset, can_view_others_dataset]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to view datasets.")
 
         if url_prefix is None or url_prefix == "":
             abort(400, message="Url prefix of the dataset is required")
@@ -213,7 +219,7 @@ class DatasetFactory(object):
         can_destroy_others_dataset = bool(self.token.privileges & Privileges.ADMIN_DESTROY_TOKEN)
 
         if not any([can_destroy_inner_dataset, can_destroy_others_dataset]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to destroy datasets.")
 
         if url_prefix is None or url_prefix == "":
             abort(400, message="Url prefix of the dataset is required")

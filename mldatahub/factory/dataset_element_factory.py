@@ -57,7 +57,7 @@ class DatasetElementFactory(object):
         can_create_others_elements = bool(self.token.privileges & Privileges.ADMIN_CREATE_TOKEN)
 
         if not any([can_create_inner_element, can_create_others_elements]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to create elements inside this dataset.")
 
         if not can_create_others_elements and self._dataset_limit_reached():
             abort(401, message="Dataset limit reached.")
@@ -70,18 +70,18 @@ class DatasetElementFactory(object):
 
         if element_content is None:
             if 'http_ref' not in kwargs and 'file_ref_id' not in kwargs:
-                abort(400)
+                abort(400, message="At least an HTTP reference or a content is required to create an element.")
 
             if 'file_ref_id' in kwargs and not can_create_others_elements:
                 # Antiexploit: otherwise users might add resources from other tokens over here.
-                abort(401)
+                abort(401, message="There is a field not allowed in the creation request.")
         else:
             # We save the file into the storage
             file_id = self.storage.put_file_content(element_content)
             kwargs['file_ref_id'] = file_id
 
         if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_create_others_elements:
-            abort(401)
+            abort(401, message="There is a field not allowed in the creation request.")
 
         kwargs['dataset'] = self.dataset
         if 'file_ref_id' not in kwargs:
@@ -97,7 +97,7 @@ class DatasetElementFactory(object):
         can_create_others_elements = bool(self.token.privileges & Privileges.ADMIN_CREATE_TOKEN)
 
         if not any([can_create_inner_element, can_create_others_elements]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to create elements inside this dataset.")
 
         if not can_create_others_elements and self._dataset_limit_reached(len(elements_kwargs)):
             abort(401, message="Dataset limit reached. Can't add this set of elements. There are only {} slots free".format(len(self.dataset.elements) - self.token.max_dataset_size))
@@ -113,18 +113,18 @@ class DatasetElementFactory(object):
 
             if element_content is None:
                 if 'http_ref' not in kwargs and 'file_ref_id' not in kwargs:
-                    abort(400)
+                    abort(400, message="At least an HTTP reference or a content is required to create an element.")
 
                 if 'file_ref_id' in kwargs and not can_create_others_elements:
                     # Antiexploit: otherwise users might add resources from other tokens over here.
-                    abort(401)
+                    abort(401, message="There is a field not allowed in the creation request.")
             else:
                 # We save the file into the storage
                 file_id = self.storage.put_file_content(element_content)
                 kwargs['file_ref_id'] = file_id
 
             if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_create_others_elements:
-                abort(401)
+                abort(401, message="There is a field not allowed in the creation request.")
 
             kwargs['dataset'] = self.dataset
             if 'file_ref_id' not in kwargs:
@@ -142,7 +142,7 @@ class DatasetElementFactory(object):
         can_edit_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
         if not any([can_edit_inner_element, can_edit_others_elements]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to edit elements inside this dataset.")
 
         if 'file_ref_id' in kwargs and not can_edit_others_elements:
             abort(401, message="File ref ID not allowed.")
@@ -191,7 +191,7 @@ class DatasetElementFactory(object):
         can_edit_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
         if not any([can_edit_inner_element, can_edit_others_elements]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to edit elements inside this dataset.")
 
         elements_ids = list(elements_kwargs.keys())
 
@@ -209,10 +209,10 @@ class DatasetElementFactory(object):
             kwargs = elements_kwargs[dataset_element._id]
 
             if 'file_ref_id' in kwargs and not can_edit_others_elements:
-                abort(401, message="File ref ID not allowed.")
+                abort(401, message="There is a field not allowed in the edit request.")
 
             if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_edit_others_elements:
-                abort(401, message="Dataset can't be modified.")
+                abort(401, message="There is a field not allowed in the edit request.")
 
             if 'content' in kwargs:
                 # New content to append here...
@@ -264,8 +264,7 @@ class DatasetElementFactory(object):
         can_edit_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
         if not any([can_edit_inner_element, can_edit_others_elements]):
-            abort(401)
-
+            abort(401, message="Your token does not have privileges enough to clone an element.")
 
         dataset = DatasetFactory(self.token).get_dataset(dest_dataset_url_prefix)
 
@@ -288,7 +287,7 @@ class DatasetElementFactory(object):
         can_edit_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
         if not any([can_edit_inner_element, can_edit_others_elements]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to clone elements.")
 
         dataset = DatasetFactory(self.token).get_dataset(dest_dataset_url_prefix)
 
@@ -311,15 +310,15 @@ class DatasetElementFactory(object):
         can_view_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
         if not any([can_view_inner_element, can_view_others_elements]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to view this dataset.")
 
         dataset_element = DatasetElementDAO.query.get(_id=element_id)
 
         if dataset_element is None:
-            abort(401)
+            abort(401, message="The element wasn't found.")
 
         if not self.dataset.has_element(dataset_element):
-            abort(401)
+            abort(401, message="The element wasn't found.")
 
         return dataset_element
 
@@ -328,7 +327,7 @@ class DatasetElementFactory(object):
         can_view_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
         if not any([can_view_inner_element, can_view_others_elements]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to view these elements")
 
         max_page_size = global_config.get_page_size()
         min_page_size = 0
@@ -343,7 +342,7 @@ class DatasetElementFactory(object):
         can_view_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
 
         if not any([can_view_inner_element, can_view_others_elements]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to view these elements")
 
         if len(elements_id) > global_config.get_page_size():
             abort(416, message="Page size exceeded")
@@ -397,7 +396,7 @@ class DatasetElementFactory(object):
         can_destroy_others_elements = bool(self.token.privileges & Privileges.ADMIN_DESTROY_TOKEN)
 
         if not any([can_destroy_inner_element, can_destroy_others_elements]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to destroy elements")
 
         # Destroy only removes the reference to the file, but not the file itself.
         # Files are automatically removed by the Garbage Collector observer.
@@ -405,10 +404,10 @@ class DatasetElementFactory(object):
         dataset_element = DatasetElementDAO.query.get(_id=element_id)
 
         if dataset_element is None:
-            abort(401)
+            abort(401, message="The element could not be found.")
 
         if not self.dataset.has_element(dataset_element) and not can_destroy_others_elements:
-            abort(401)
+            abort(401, message="The element does not exist inside the dataset, can't be destroyed.")
 
         dataset_element.delete(owner_id=self.dataset._id)
 
@@ -422,7 +421,7 @@ class DatasetElementFactory(object):
         can_destroy_others_elements = bool(self.token.privileges & Privileges.ADMIN_DESTROY_TOKEN)
 
         if not any([can_destroy_inner_element, can_destroy_others_elements]):
-            abort(401)
+            abort(401, message="Your token does not have privileges enough to destroy these elements")
 
         if len(elements_ids) > global_config.get_page_size():
             abort(416, message="Page size exceeded")
