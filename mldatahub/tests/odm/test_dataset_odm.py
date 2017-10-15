@@ -195,6 +195,36 @@ class TestDatasetODM(unittest.TestCase):
         dataset2 = DatasetDAO("ip/asd5", "example6", "desc", "none")
         self.assertEqual(dataset2.url_prefix, "ip/asd5")
 
+    def test_dataset_tags_allow_dicts(self):
+        """
+        Dataset elements tags allow dictionaries as elements.
+        :return:
+        """
+        dataset = DatasetDAO("ip/asd4", "example4", "desc", "none", tags=["tag1", {"tag2":"tag example"}])
+
+        self.session.flush()
+
+        self.assertTrue(dataset.tags[0], "tag1")
+        self.assertTrue(dataset.tags[1], {"tag2":"tag example"})
+
+
+    def test_dataset_element_tags_allow_dicts(self):
+        """
+        Dataset elements tags allow dictionaries as elements.
+        :return:
+        """
+        dataset = DatasetDAO("ip/asd4", "example4", "desc", "none")
+
+        element = dataset.add_element("ele1", "description of the element.", None, tags=["tag1", {"tag2":"tag example"}])
+
+        self.session.flush()
+
+        element = dataset.elements[0]
+
+        self.assertTrue(element.tags[0], "tag1")
+        self.assertTrue(element.tags[1], {"tag2":"tag example"})
+
+
     def tearDown(self):
         DatasetDAO.query.remove()
         DatasetCommentDAO.query.remove()

@@ -60,7 +60,7 @@ class DatasetDAO(MappedClass):
     reference = FieldProperty(schema.String)
     creation_date = FieldProperty(schema.datetime)
     modification_date = FieldProperty(schema.datetime)
-    tags = FieldProperty(schema.Array(schema.String))
+    tags = FieldProperty(schema.Array(schema.Anything))
     fork_count = FieldProperty(schema.Int)
     forked_from_id = ForeignIdProperty('DatasetDAO')
 
@@ -155,7 +155,7 @@ class DatasetElementDAO(MappedClass):
     description = FieldProperty(schema.String)
     file_ref_id = ForeignIdProperty('FileDAO')
     http_ref = FieldProperty(schema.String)
-    tags = FieldProperty(schema.Array(schema.String))
+    tags = FieldProperty(schema.Array(schema.Anything))
     addition_date = FieldProperty(schema.datetime)
     modification_date = FieldProperty(schema.datetime)
     dataset_id = ForeignIdProperty('DatasetDAO')

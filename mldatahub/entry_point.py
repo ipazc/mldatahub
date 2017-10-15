@@ -110,7 +110,6 @@ def create_token(args):
     from mldatahub.odm.token_dao import TokenDAO
     token = TokenDAO(args.description, args.maxds, args.maxl, args.namespace, privileges=args.privileges)
 
-    #parser.print_help()
     global_config.get_session().flush()
     print("*****************************************")
     print("Characteristics of token")
