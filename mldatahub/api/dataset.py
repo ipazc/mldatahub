@@ -345,5 +345,7 @@ class DatasetSize(TokenizedResource):
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
         total_size = global_config.get_storage().get_files_size([l.file_ref_id for l in dataset.elements])
+        dataset.size = total_size
+        self.session.flush()
 
         return total_size, 200

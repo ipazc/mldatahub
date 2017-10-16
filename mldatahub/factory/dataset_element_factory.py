@@ -62,8 +62,6 @@ class DatasetElementFactory(object):
         if not can_create_others_elements and self._dataset_limit_reached():
             abort(401, message="Dataset limit reached.")
 
-        size = self.dataset.size
-
         try:
             element_content = kwargs["content"]
             del kwargs["content"]
@@ -80,7 +78,6 @@ class DatasetElementFactory(object):
         else:
             # We save the file into the storage
             file_id = self.storage.put_file_content(element_content)
-            size += len(element_content)
             kwargs['file_ref_id'] = file_id
 
         if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_create_others_elements:
@@ -91,7 +88,6 @@ class DatasetElementFactory(object):
             kwargs['file_ref_id'] = None
 
         dataset_element = DatasetElementDAO(**kwargs)
-        self.dataset.size = size
         self.session.flush()
 
         return dataset_element
@@ -107,7 +103,6 @@ class DatasetElementFactory(object):
             abort(401, message="Dataset limit reached. Can't add this set of elements. There are only {} slots free".format(len(self.dataset.elements) - self.token.max_dataset_size))
 
         dataset_elements = []
-        size = self.dataset.size
         for kwargs in elements_kwargs:
 
             try:
@@ -126,7 +121,6 @@ class DatasetElementFactory(object):
             else:
                 # We save the file into the storage
                 file_id = self.storage.put_file_content(element_content)
-                size += len(element_content)
                 kwargs['file_ref_id'] = file_id
 
             if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_create_others_elements:
@@ -139,7 +133,6 @@ class DatasetElementFactory(object):
             dataset_element = DatasetElementDAO(**kwargs)
             dataset_elements.append(dataset_element)
 
-        self.dataset.size = size
         self.session.flush()
 
         return dataset_elements
@@ -154,15 +147,12 @@ class DatasetElementFactory(object):
         if 'file_ref_id' in kwargs and not can_edit_others_elements:
             abort(401, message="File ref ID not allowed.")
 
-        size = self.dataset.size
-
         dataset_element = DatasetElementDAO.query.get(_id=element_id)
 
         if 'content' in kwargs:
             # New content to append here...
             file_id = self.storage.put_file_content(kwargs['content'])
             prev_size = self.storage.get_files_size([dataset_element.file_ref_id])
-            size += len(kwargs['content']) - prev_size
             kwargs['file_ref_id'] = file_id
 
         if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_edit_others_elements:
@@ -194,7 +184,6 @@ class DatasetElementFactory(object):
             if k is not None and v is not None:
                 dataset_element[k] = v
 
-        self.dataset.size = size
         self.session.flush()
 
         return dataset_element
@@ -232,10 +221,6 @@ class DatasetElementFactory(object):
                 elements_ids.append(dataset_element._id)
                 elements_content.append(kwargs['content'])
 
-        size = self.dataset.size
-
-        previous_size = self.storage.get_files_size([d.file_ref_id for d in dataset_elements])
-
         files_refs = {element_id: file for element_id, file in zip(elements_ids, self.storage.put_files_contents(elements_content))}
 
         result_elements = []
@@ -271,9 +256,6 @@ class DatasetElementFactory(object):
         if len(result_elements) == 0:
             abort(404, message="Elements not found.")
 
-        new_size = self.storage.get_files_size([d.file_ref_id for d in dataset_elements])
-        size += new_size - previous_size
-        self.dataset.size = size
         self.session.flush()
 
         return result_elements
