@@ -18,9 +18,10 @@ On mongo, it is required to set indexes on `element.addition_date`, `element.dat
 
 .. code:: javascript
 
-    db.element.create_index({'addition_date': 1})
-    db.element.create_index({'dataset_id': 1})
-    db.file.create_index({'sha256': 1})
+    db.element.createIndex({'addition_date': 1})
+    db.element.createIndex({'dataset_id': 1})
+    db.element.createIndex({'file_ref_id': 1})
+    db.file.createIndex({'sha256': 1})
 
 
 =======
