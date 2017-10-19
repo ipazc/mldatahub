@@ -24,7 +24,6 @@ On mongo, it is required to set indexes on `element.addition_date`, `element.dat
     db.file.createIndex({'sha256': 1})
 
 
-
 =======
 LICENSE
 =======
