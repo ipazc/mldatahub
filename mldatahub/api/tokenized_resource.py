@@ -22,7 +22,8 @@
 
 from flask import request
 from flask_restful import reqparse, abort, Resource
-from mldatahub.config.config import now, global_config
+from mldatahub.helper.timing_helper import now
+from mldatahub.config.config import global_config
 from mldatahub.odm.dataset_dao import DatasetDAO
 from mldatahub.odm.restapi_dao import RestAPIDAO
 from mldatahub.odm.token_dao import TokenDAO

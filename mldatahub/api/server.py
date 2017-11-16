@@ -26,7 +26,7 @@ __author__ = "Iván de Paz Centeno"
 from flask import request
 from mldatahub import __version__
 from mldatahub.api.tokenized_resource import TokenizedResource, control_access
-from mldatahub.config.config import global_config, now
+from mldatahub.config.config import global_config
 from mldatahub.config.privileges import Privileges
 from mldatahub.factory.dataset_factory import DatasetFactory
 from mldatahub.factory.token_factory import TokenFactory

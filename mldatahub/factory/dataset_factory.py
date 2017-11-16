@@ -23,8 +23,8 @@
 from flask_restful import abort
 from mldatahub.odm.dataset_dao import DatasetDAO
 from mldatahub.odm.token_dao import TokenDAO
-
-from mldatahub.config.config import global_config, now
+from mldatahub.helper.timing_helper import now
+from mldatahub.config.config import global_config
 from mldatahub.config.privileges import Privileges
 
 __author__ = 'Iván de Paz Centeno'

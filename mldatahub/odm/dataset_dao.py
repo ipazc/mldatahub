@@ -22,7 +22,8 @@
 
 from multiprocessing import Lock
 from bson import ObjectId
-from mldatahub.config.config import global_config, now
+from mldatahub.helper.timing_helper import now
+from mldatahub.config.config import global_config
 from mldatahub.odm.file_dao import FileDAO
 from ming import schema
 from ming.odm import ForeignIdProperty, MappedClass, FieldProperty

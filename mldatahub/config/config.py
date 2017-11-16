@@ -19,24 +19,20 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
+
 import json
 import os
 from dateutil.relativedelta import relativedelta
 from ming import create_datastore
 from ming.odm import ThreadLocalODMSession
-import datetime
+from mldatahub.helper.timing_helper import now
 
 __author__ = 'Iván de Paz Centeno'
 
 HOME = os.path.expanduser("~")
 
-
-def now():
-    return datetime.datetime.now()
-
 def token_future_end():
     return now() + relativedelta(months=+1)
-
 
 class GlobalConfig(object):
 
@@ -86,6 +82,9 @@ class GlobalConfig(object):
 
     def set_file_size_limit(self, new_file_size_limit):
         self.config_values['file_size_limit'] = new_file_size_limit
+
+    def set_google_drive_folder(self, google_drive_folder):
+        self.config_values['google_drive_folder'] = google_drive_folder
 
     def get_host(self):
         if 'host' not in self.config_values:
@@ -138,5 +137,10 @@ class GlobalConfig(object):
         if 'file_size_limit' not in self.config_values:
             self.config_values['file_size_limit'] = 16*1024*1024  # 16 MB
         return self.config_values['file_size_limit']
+
+    def get_google_drive_folder(self):
+        if 'google_drive_folder' not in self.config_values:
+            self.config_values['google_drive_folder'] = "mldatahub/"
+        return self.config_values['google_drive_folder']
 
 global_config = GlobalConfig()

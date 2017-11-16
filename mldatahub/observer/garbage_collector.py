@@ -25,7 +25,8 @@ from threading import Thread
 from time import sleep
 
 import datetime
-from mldatahub.config.config import now, global_config
+from mldatahub.helper.timing_helper import now, Measure, time_left_as_str
+from mldatahub.config.config import global_config
 from mldatahub.odm.dataset_dao import DatasetElementDAO
 
 TIMER_TICK = global_config.get_garbage_collector_timer_interval()  # seconds
@@ -42,7 +43,7 @@ def segment(l, count):
         yield l[(blocks)*count:]
 
 def progress(current, max, string):
-    print("\r[{}%] {}/{} - {}                  "
+    print("\r[{:05.2f}%] {}/{} - {}                  "
           "".format(round(current/max * 100, 2), current, max, string), end="", flush=True)
 
 
@@ -92,15 +93,35 @@ class GarbageCollector(object):
         print("[GC] {} files to be checked.".format(files_count))
 
         sleep_batch=50
+        files_per_second = [0]
+        files_per_second_avg = 0
+        time_remaining = -1
 
-        for index, file in enumerate(self.storage):
-            if DatasetElementDAO.get(file_ref_id=file._id) is None:
-                unused_files.append(file._id)
+        with Measure() as timing:
+            for index, file in enumerate(self.storage):
+                if DatasetElementDAO.query.get(file_ref_id=file._id) is None:
+                    unused_files.append(file._id)
 
-            if index % sleep_batch == 0:
-                sleep(0.1)
-            progress(index+1, files_count, "{} files are orphan.".format(len(unused_files)))
+                if index % sleep_batch == 0:
+                    sleep(0.1)
 
+                if len(files_per_second) < 5:
+                    files_per_second[-1] += 1
+                    if timing.elapsed().seconds >= 1:
+                        files_per_second.append(0)
+                        timing.reset()
+
+                    files_per_second_avg = sum(files_per_second) / len(files_per_second)
+                    time_remaining = ""
+                else:
+                    time_remaining = " {} remaining".format(time_left_as_str((len(self.storage) - index) // files_per_second_avg))
+
+                if self.__stop_requested():
+                    break
+
+                progress(index+1, files_count, "{} files are orphan.{}".format(len(unused_files), time_remaining))
+
+        print("")
         return unused_files
 
     def do_garbage_collect(self):
@@ -130,7 +151,7 @@ class GarbageCollector(object):
             files_count += len(list_ids)
             self.storage.delete_files(list_ids)
             progress(files_count, len(remove_files), "{} files garbage collected.".format(files_count))
-            sleep(1)
+            sleep(0.1)
 
         self.previous_unused_files = set(new_unused_files)
 

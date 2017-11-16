@@ -25,7 +25,8 @@ from flask_restful import abort
 from ming.odm.odmsession import ODMCursor
 from mldatahub.storage.generic_storage import GenericStorage
 from mldatahub.factory.dataset_factory import DatasetFactory
-from mldatahub.config.config import global_config, now
+from mldatahub.helper.timing_helper import now
+from mldatahub.config.config import global_config
 from mldatahub.config.privileges import Privileges
 from mldatahub.odm.token_dao import TokenDAO
 from mldatahub.odm.dataset_dao import DatasetDAO

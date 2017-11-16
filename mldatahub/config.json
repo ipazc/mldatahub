@@ -23,5 +23,8 @@
   "host": "localhost",
 
   "#9":"Listen port",
-  "port": "5555"
+  "port": "5555",
+
+  "#10":"The Google Drive folder where the off-line store content is going to be stored",
+  "google_drive_folder": "mldatahub/"
 }

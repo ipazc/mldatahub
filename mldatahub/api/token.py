@@ -22,8 +22,8 @@
 
 from flask_restful import reqparse, abort
 from mldatahub.api.tokenized_resource import TokenizedResource, control_access
-
-from mldatahub.config.config import now, global_config
+from mldatahub.helper.timing_helper import now
+from mldatahub.config.config import global_config
 from mldatahub.config.privileges import Privileges
 from mldatahub.factory.token_factory import TokenFactory
 
