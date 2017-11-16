@@ -25,14 +25,26 @@ from threading import Thread
 from time import sleep
 
 import datetime
-
-from mldatahub.storage.generic_storage import GenericStorage
 from mldatahub.config.config import now, global_config
 from mldatahub.odm.dataset_dao import DatasetElementDAO
 
 TIMER_TICK = global_config.get_garbage_collector_timer_interval()  # seconds
 
 __author__ = 'Iván de Paz Centeno'
+
+def segment(l, count):
+    b = 0
+    blocks = len(l) // count
+    for b in range(blocks):
+        yield l[b*count:(b+1)*count]
+
+    if len(l) % count > 0:
+        yield l[(blocks)*count:]
+
+def progress(current, max, string):
+    print("\r[{}%] {}/{} - {}                  "
+          "".format(round(current/max * 100, 2), current, max, string), end="", flush=True)
+
 
 class GarbageCollector(object):
     """
@@ -51,6 +63,7 @@ class GarbageCollector(object):
     def __init__(self):
         self.thread = Thread(target=self.__thread_func, daemon=True)
         self.thread.start()
+        self.previous_unused_files = {}
 
     def __stop_requested(self):
         with self.lock:
@@ -67,16 +80,63 @@ class GarbageCollector(object):
             sleep(1)
         print("[GC] Exited.")
 
+    def collect_unused_files(self):
+        """
+        Searchs for unused files in the DB and returns a list of ids.
+        :return: list with IDs of the unused files.
+        """
+        unused_files = []
+
+        files_count = len(self.storage)
+
+        print("[GC] {} files to be checked.".format(files_count))
+
+        sleep_batch=50
+
+        for index, file in enumerate(self.storage):
+            if DatasetElementDAO.get(file_ref_id=file._id) is None:
+                unused_files.append(file._id)
+
+            if index % sleep_batch == 0:
+                sleep(0.1)
+            progress(index+1, files_count, "{} files are orphan.".format(len(unused_files)))
+
+        return unused_files
+
     def do_garbage_collect(self):
+        print("[GC] Collecting garbage...")
+
         global_config.session.clear()
-        refs_in_use = {element.file_ref_id for element in DatasetElementDAO.query.find({})}
-        garbage_files = {file._id for file in self.storage if file._id not in refs_in_use}
 
-        if len(garbage_files) > 0:
-            self.storage.delete_files(list(garbage_files))
+        # 1. We retrieve the unused files.
+        unused_files = self.collect_unused_files()
 
-        print("[GC] Cleaned {} elements".format(len(garbage_files)))
-        return len(garbage_files)
+        # 2. We check how many unused files are in common with the previous unused files.
+        new_unused_files = []
+        remove_files = []
+        print("[GC] Comparing {} unused files to previous {} unused files.".format(len(unused_files), len(self.previous_unused_files)))
+
+        print("[GC] Cleaning {} elements...".format(len(remove_files)))
+
+        for index, file in enumerate(unused_files):
+            if file in self.previous_unused_files:
+                remove_files.append(file)
+            else:
+                new_unused_files.append(file)
+
+        # 3. We delete by batches
+        files_count = 0
+        for list_ids in segment(remove_files, 50):
+            files_count += len(list_ids)
+            self.storage.delete_files(list_ids)
+            progress(files_count, len(remove_files), "{} files garbage collected.".format(files_count))
+            sleep(1)
+
+        self.previous_unused_files = set(new_unused_files)
+
+        print("[GC] Cleaned {} elements...".format(len(remove_files)))
+
+        return files_count
 
     def stop(self, wait_for_finish=True):
         with self.lock:

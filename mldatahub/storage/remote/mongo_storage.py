@@ -100,7 +100,7 @@ class MongoStorage(GenericStorage):
         FileDAO.query.remove({'_id': file.id})
 
     def delete_files(self, files_ids:list):
-        FileDAO.query.remove({'_id': {'$in' : files_ids}})
+        FileDAO.query.remove({'_id': {'$in': files_ids}})
 
     def __contains__(self, item):
         return FileDAO.query.get(_id=item) is not None
