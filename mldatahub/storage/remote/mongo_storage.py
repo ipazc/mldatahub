@@ -23,6 +23,7 @@
 from bson import ObjectId
 from mldatahub.config.config import global_config
 from mldatahub.odm.file_dao import FileDAO, FileContentDAO
+from mldatahub.storage.exceptions.file_size_exceeded import FileSizeExceeded
 from mldatahub.storage.generic_storage import GenericStorage, File
 import hashlib
 
@@ -46,7 +47,7 @@ class MongoStorage(GenericStorage):
         length = len(content_bytes)
 
         if length >= FILE_SIZE_LIMIT:
-            raise Exception("File size limit of {} Bytes exceeded".format(FILE_SIZE_LIMIT))
+            raise FileSizeExceeded("File size limit of {} Bytes exceeded".format(FILE_SIZE_LIMIT))
 
         # Let's optimize the storage now
         sha256 = hashlib.sha256(content_bytes).hexdigest()
@@ -62,7 +63,7 @@ class MongoStorage(GenericStorage):
         length_exceeded = any([len(content_bytes) >= FILE_SIZE_LIMIT for content_bytes in content_bytes_list])
 
         if length_exceeded:
-            raise Exception("File size limit of {} Bytes exceeded".format(FILE_SIZE_LIMIT))
+            raise FileSizeExceeded("File size limit of {} Bytes exceeded".format(FILE_SIZE_LIMIT))
 
         sha256s = {hashlib.sha256(content_bytes).hexdigest(): content_bytes for content_bytes in content_bytes_list}
 

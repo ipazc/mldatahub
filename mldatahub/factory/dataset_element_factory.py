@@ -23,6 +23,7 @@
 from bson import ObjectId
 from flask_restful import abort
 from ming.odm.odmsession import ODMCursor
+from mldatahub.storage.exceptions.file_size_exceeded import FileSizeExceeded
 from mldatahub.storage.generic_storage import GenericStorage
 from mldatahub.factory.dataset_factory import DatasetFactory
 from mldatahub.helper.timing_helper import now
@@ -121,7 +122,12 @@ class DatasetElementFactory(object):
                     abort(401, message="There is a field not allowed in the creation request.")
             else:
                 # We save the file into the storage
-                file_id = self.storage.put_file_content(element_content)
+                try:
+                    file_id = self.storage.put_file_content(element_content)
+                except FileSizeExceeded as ex:
+                    file_id = None
+                    abort(413, message=str(ex))
+
                 kwargs['file_ref_id'] = file_id
 
             if ('dataset' in kwargs or 'dataset_id' in kwargs) and not can_create_others_elements:
@@ -222,7 +228,11 @@ class DatasetElementFactory(object):
                 elements_ids.append(dataset_element._id)
                 elements_content.append(kwargs['content'])
 
-        files_refs = {element_id: file for element_id, file in zip(elements_ids, self.storage.put_files_contents(elements_content))}
+        try:
+            files_refs = {element_id: file for element_id, file in zip(elements_ids, self.storage.put_files_contents(elements_content))}
+        except FileSizeExceeded as ex:
+            files_refs = None
+            abort(413, message=str(ex))
 
         result_elements = []
         for dataset_element in dataset_elements:
