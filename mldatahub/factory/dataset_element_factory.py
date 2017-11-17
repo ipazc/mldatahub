@@ -336,7 +336,10 @@ class DatasetElementFactory(object):
         min_page_size = 0
 
         if min_page_size < page_size <= max_page_size:
-            return self.dataset.get_elements(options).skip(page*page_size).limit(page_size)
+            try:
+                return self.dataset.get_elements(options).skip(page*page_size).limit(page_size)
+            except Exception:
+                abort(400, message="Provided options syntax is wrong.")
         else:
             abort(409, message="The page size can't be greater than {}".format(global_config.get_page_size()))
 
