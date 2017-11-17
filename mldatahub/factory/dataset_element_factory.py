@@ -432,7 +432,10 @@ class DatasetElementFactory(object):
 
         return self.dataset
 
-    def destroy_elements(self, elements_ids:list) -> DatasetDAO:
+    def destroy_elements(self, elements_ids: list=None) -> DatasetDAO:
+        if elements_ids is None:
+            elements_ids = []
+
         can_destroy_inner_element = bool(self.token.privileges & Privileges.DESTROY_ELEMENTS)
         can_destroy_others_elements = bool(self.token.privileges & Privileges.ADMIN_DESTROY_TOKEN)
 
@@ -445,7 +448,12 @@ class DatasetElementFactory(object):
         # Destroy only removes the reference to the file, but not the file itself.
         # Files are automatically removed by the Garbage Collector observer.
 
-        dataset_elements = DatasetElementDAO.query.find({'dataset_id': self.dataset._id, '_id': {'$in': elements_ids}})
+        find_query = {'dataset_id': self.dataset._id}
+
+        if len(elements_ids) > 0:
+            find_query['_id'] = {'$in': elements_ids}
+
+        dataset_elements = DatasetElementDAO.query.find(find_query)
 
         if dataset_elements.count() < len(elements_ids):
             # Let's find which elements do not exist.

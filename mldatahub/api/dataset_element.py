@@ -219,6 +219,9 @@ class DatasetElementsBundle(TokenizedResource):
         # That json value is required, it is validated by the get_parser; so, it is ensured that key exists in the dict.
         elements_ids = request.json['elements']
 
+        # Note that if no elements are provided (length is 0) then we purge the whole dataset. It is the clear()
+        # behavior.
+
         DatasetElementFactory(token, dataset).destroy_elements([ObjectId(x) for x in elements_ids])
 
         self.session.flush()

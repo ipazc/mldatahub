@@ -269,6 +269,14 @@ class TestDatasetElementFactory(unittest.TestCase):
         self.assertEqual(len(dataset.elements), 1)
         self.assertEqual(dataset.elements[0]._id, element3._id)
 
+        element  = DatasetElementDAO("example1", "none", file_id1, dataset=dataset)
+        element2 = DatasetElementDAO("example2", "none", file_id1, dataset=dataset)
+
+        self.session.flush()
+        dataset = dataset.update()
+
+        DatasetElementFactory(destructor, dataset).destroy_elements()
+
     def test_dataset_element_edit(self):
         """
         Factory can edit elements from datasets.
