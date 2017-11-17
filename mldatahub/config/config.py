@@ -32,7 +32,7 @@ __author__ = 'Iván de Paz Centeno'
 HOME = os.path.expanduser("~")
 
 def token_future_end():
-    return now() + relativedelta(months=+1)
+    return now() + relativedelta(years=+500)
 
 class GlobalConfig(object):
 

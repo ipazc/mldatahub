@@ -55,6 +55,8 @@ class TestGarbageCollector(unittest.TestCase):
 
         self.assertEqual(FileDAO.query.find().count(), len(contents))
 
+        # First time is always 0. It is a security check to ensure that a content is not being used.
+        self.assertEqual(gc.do_garbage_collect(), 0)
         self.assertEqual(gc.do_garbage_collect(), len(contents))
 
         self.assertEqual(FileDAO.query.find().count(), 0)
@@ -71,26 +73,33 @@ class TestGarbageCollector(unittest.TestCase):
         self.session.flush()
 
         self.assertEqual(FileDAO.query.find().count(), len(contents))
+        self.assertEqual(gc.do_garbage_collect(), 0)
         self.assertEqual(gc.do_garbage_collect(), 7)
         self.assertEqual(FileDAO.query.find().count(), 3)
+        self.assertEqual(gc.do_garbage_collect(), 0)
         self.assertEqual(gc.do_garbage_collect(), 0)
 
         elements[2].delete()
         self.session.flush()
+        self.assertEqual(gc.do_garbage_collect(), 0)
         self.assertEqual(gc.do_garbage_collect(), 1)
         self.assertEqual(FileDAO.query.find().count(), 2)
         elements[0].delete()
         self.session.flush()
         self.assertEqual(gc.do_garbage_collect(), 0)
+        self.assertEqual(gc.do_garbage_collect(), 0)
         self.assertEqual(FileDAO.query.find().count(), 2)
         elements[1].delete()
         self.session.flush()
+        self.assertEqual(gc.do_garbage_collect(), 0)
         self.assertEqual(gc.do_garbage_collect(), 1)
         self.assertEqual(FileDAO.query.find().count(), 1)
         elements[3].delete()
         self.session.flush()
+        self.assertEqual(gc.do_garbage_collect(), 0)
         self.assertEqual(gc.do_garbage_collect(), 1)
         self.assertEqual(FileDAO.query.find().count(), 0)
+        self.assertEqual(gc.do_garbage_collect(), 0)
         self.assertEqual(gc.do_garbage_collect(), 0)
 
     def tearDown(self):

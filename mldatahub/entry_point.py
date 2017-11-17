@@ -22,6 +22,8 @@
 
 import signal
 import sys
+from dateutil.relativedelta import relativedelta
+from mldatahub.helper.timing_helper import now
 import mldatahub
 from mldatahub.config.config import global_config
 import argparse
@@ -100,7 +102,8 @@ def create_token(args):
     parser.add_argument("description", type=str, help="Description of the token")
     parser.add_argument("--maxds", type=int, help="Maximum number of datasets for this token", default=50)
     parser.add_argument("--maxl", type=int, help="Maximum number of elements for this token", default=10000000)
-    parser.add_argument("--privileges", type=int, help="Privileges", default=privileges)
+    parser.add_argument("--token-duration-days", type=int, dest="token_duration_days", help="Number of days that this token will last active", default=36500)
+    parser.add_argument("--privileges", type=int, help="Privileges for this token", default=privileges)
 
     args = parser.parse_args(args)
 
@@ -111,7 +114,12 @@ def create_token(args):
 
     from mldatahub.odm.dataset_dao import DatasetDAO
     from mldatahub.odm.token_dao import TokenDAO
-    token = TokenDAO(args.description, args.maxds, args.maxl, args.namespace, privileges=args.privileges)
+
+    duration_in_days = args.token_duration_days
+
+    token = TokenDAO(description=args.description, max_dataset_count=args.maxds, max_dataset_size=args.maxl,
+                     url_prefix=args.namespace, end_date=now()+relativedelta(days=+duration_in_days),
+                     privileges=args.privileges)
 
     global_config.get_session().flush()
     print("*****************************************")
@@ -122,9 +130,9 @@ def create_token(args):
     print("MAX DATASETS: {}".format(args.maxds))
     print("MAX ELEMENTS PER DATASET: {}".format(args.maxl))
     print("PRIVILEGES: {}".format(privileges))
+    print("END_DATE: {} ({} days remaining)".format(token.end_date, duration_in_days))
     print("*****************************************")
     print("TOKEN:", token.token_gui)
-
 
 def build_app():
     from flask import Flask
