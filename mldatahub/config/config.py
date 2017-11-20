@@ -98,6 +98,12 @@ class GlobalConfig(object):
 
         return int(self.config_values['port'])
 
+    def get_session_uri(self):
+        if 'session_uri' not in self.config_values:
+            self.set_session_uri("mongodb://localhost:27017/mldatahub")
+
+        return self.config_values['session_uri']
+
     def get_session(self):
         if 'session_uri' not in self.config_values:
             self.set_session_uri("mongodb://localhost:27017/mldatahub")

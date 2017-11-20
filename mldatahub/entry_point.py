@@ -107,19 +107,9 @@ def create_token(args):
 
     args = parser.parse_args(args)
 
-    illegal_chars = "/*;:,.ç´`+Ç¨^><¿?'¡¿!\"·$%&()@~¬"
-    if any([i in args.namespace for i in illegal_chars]):
-        print("[ERROR] The namespace can't hold any of the following chars:\n\"{}\"".format(illegal_chars))
-        exit(-1)
-
-    from mldatahub.odm.dataset_dao import DatasetDAO
-    from mldatahub.odm.token_dao import TokenDAO
-
     duration_in_days = args.token_duration_days
 
-    token = TokenDAO(description=args.description, max_dataset_count=args.maxds, max_dataset_size=args.maxl,
-                     url_prefix=args.namespace, end_date=now()+relativedelta(days=+duration_in_days),
-                     privileges=args.privileges)
+    token = __create_token__(args.namespace, args.description, args.maxds, args.maxl, args.privileges, duration_in_days)
 
     global_config.get_session().flush()
     print("*****************************************")
@@ -134,7 +124,34 @@ def create_token(args):
     print("*****************************************")
     print("TOKEN:", token.token_gui)
 
+
+def __create_token__(namespace, description, max_datasets, max_elements_per_dataset, privileges, duration_in_days, end_date=None):
+
+    illegal_chars = "/*;:,.ç´`+Ç¨^><¿?'¡¿!\"·$%&()@~¬"
+    if any([i in namespace for i in illegal_chars]):
+        print("[ERROR] The namespace can't hold any of the following chars:\n\"{}\"".format(illegal_chars))
+        exit(-1)
+
+    from mldatahub.odm.dataset_dao import DatasetDAO
+    from mldatahub.odm.token_dao import TokenDAO
+
+    if end_date is not None:
+        end_date = end_date
+    else:
+        end_date = now()+relativedelta(days=+duration_in_days)
+
+    token = TokenDAO(description=description, max_dataset_count=max_datasets, max_dataset_size=max_elements_per_dataset,
+                     url_prefix=namespace, end_date=end_date,
+                     privileges=privileges)
+
+    global_config.get_session().flush()
+
+    return token
+
+
 def build_app():
+    #print("Mongo session: {}".format(global_config.get_session_uri()))
+
     from flask import Flask
     from flask_restful import Api
     from mldatahub.api.dataset import Datasets, Dataset, DatasetForker, DatasetSize
