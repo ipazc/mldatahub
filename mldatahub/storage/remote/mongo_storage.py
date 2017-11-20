@@ -82,11 +82,11 @@ class MongoStorage(GenericStorage):
 
         return [file_by_hash[hash_by_content[content]]._id for content in content_bytes_list]
 
-    def get_file(self, file_id:ObjectId):
+    def get_file(self, file_id:ObjectId) -> File:
         file = FileContentDAO.query.get(_id=file_id)
         return File(file._id, file.content, file.size)
 
-    def get_files(self, files_ids:list):
+    def get_files(self, files_ids:list) -> list:
         # We need to ensure the order of the output. It must be the same order as the input
         file_by_id = {file._id: File(file._id, file.content, file.size) for file in FileContentDAO.query.find({'_id': {'$in' : files_ids}})}
 

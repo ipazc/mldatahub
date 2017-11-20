@@ -45,10 +45,10 @@ class File(object):
 
 class GenericStorage(object):
 
-    def get_file(self, file_id):
+    def get_file(self, file_id) -> File:
         pass
 
-    def get_files(self, file_ids:list):
+    def get_files(self, file_ids:list) -> list:
         pass
 
     def put_file_content(self, content_bytes):
