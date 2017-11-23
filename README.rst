@@ -7,13 +7,13 @@ mldatahub 0.0.1
 .. image:: https://travis-ci.org/ipazc/mldatahub.svg?branch=master
     :target: https://travis-ci.org/ipazc/mldatahub
 
-This is still a work in progress. It is expected to achieve a Proof Of Concept during October 2017.
+This is still a work in progress. It is expected to achieve a Proof Of Concept during December 2017.
 
 =====
 NOTES
 =====
 
-On mongo, it is required to set indexes on `element.addition_date`, `element.dataset_id` and on `file.sha256`:
+On mongo, it is required to set some indexes:
 
 
 .. code:: javascript
@@ -21,7 +21,9 @@ On mongo, it is required to set indexes on `element.addition_date`, `element.dat
     db.element.createIndex({'addition_date': 1})
     db.element.createIndex({'dataset_id': 1})
     db.element.createIndex({'file_ref_id': 1})
+    db.element.createIndex({'_previous_id': 1})
     db.file.createIndex({'sha256': 1})
+    db.restapi.createIndex({'ip': 1})
 
 
 =======

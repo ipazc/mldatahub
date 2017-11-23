@@ -207,7 +207,7 @@ class DatasetElementFactory(object):
         if len(elements_ids) > global_config.get_page_size():
             abort(416, message="Page size exceeded")
 
-        dataset_elements = DatasetElementDAO.query.find({"dataset_id": self.dataset._id, "_id": { "$in" : elements_ids }})
+        dataset_elements = DatasetElementDAO.query.find({"dataset_id": self.dataset._id, "_id": {"$in" : elements_ids}})
 
         elements_ids = []
         elements_content = []
@@ -365,8 +365,32 @@ class DatasetElementFactory(object):
 
         elements = {e._id: e for e in self.dataset.get_elements({"_id": {"$in": elements_id }})}
 
+        elements_not_found = [element_id for element_id in elements_id if element_id not in elements]
+
+        if len(elements_not_found) > 0:
+            raise KeyError("Elements not found: {}".format(elements_not_found).replace("ObjectId(", "").replace(")", ""))
+
         # Let's order the elements in the same way as the input.
         return [elements[_id] for _id in elements_id]
+
+    def discover_real_id(self, elements_id:list) -> dict:
+        """
+        Discovers the real ID for elements whose ID has recently changed, like for example in cloned elements.
+        :param elements_id: list of old ids from elements to discover.
+        :return: associative array with Previous ID -> New ID
+        """
+        can_view_inner_element = bool(self.token.privileges & Privileges.RO_WATCH_DATASET)
+        can_view_others_elements = bool(self.token.privileges & Privileges.ADMIN_EDIT_TOKEN)
+
+        if not any([can_view_inner_element, can_view_others_elements]):
+            abort(401, message="Your token does not have privileges enough to view these elements")
+
+        if len(elements_id) > global_config.get_page_size():
+            abort(416, message="Page size exceeded")
+
+        elements = {e._previous_id: e._id for e in self.dataset.get_elements({"_previous_id": {"$in": elements_id }})}
+
+        return elements
 
     def get_element_thumbnail(self, element_id:ObjectId) -> bytes:
         # The get_element_info() method is going to make all the required checks for the retrieval of the thumbnail.

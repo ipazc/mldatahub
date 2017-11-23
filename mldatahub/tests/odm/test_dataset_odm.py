@@ -169,6 +169,35 @@ class TestDatasetODM(unittest.TestCase):
         self.assertEqual(len(dataset2.elements), 1)
         self.assertEqual(element.title, dataset2.elements[0].title)
 
+    def test_dataset_element_clone(self):
+        """
+        Dataset element clones successfully.
+        :return:
+        """
+        dataset = DatasetDAO("ip/asd3", "example3", "for content", "unknown")
+        dataset2 = DatasetDAO("ip/asd4", "example4", "for content", "unknown")
+
+        element = dataset.add_element("ele1", "description of the element.", None, tags=["tag1", "tag2"])
+
+        self.session.flush()
+        self.assertEqual(len(dataset.elements), 1)
+        self.assertEqual(len(dataset2.elements), 0)
+
+        cloned_element = element.clone(dataset._id)
+        self.session.flush()
+        dataset.update()
+        self.assertEqual(len(dataset.elements), 2)
+
+        self.assertNotEqual(element._id, cloned_element._id)
+        self.assertEqual(element._id, cloned_element._previous_id)
+
+        cloned_element2 = element.clone(dataset2._id)
+
+        self.session.flush()
+        dataset2.update()
+        self.assertEqual(len(dataset2.elements), 1)
+        self.assertEqual(element._id, cloned_element2._previous_id)
+
     def test_create_dataset_element_add_remove_comment(self):
         """
         Dataset creation and removal of comments from elements works successfully.

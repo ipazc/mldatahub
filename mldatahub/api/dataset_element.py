@@ -37,6 +37,29 @@ from mldatahub.factory.dataset_factory import DatasetFactory
 __author__ = "Iván de Paz Centeno"
 
 
+def _get_elements_real_id(elements_ids: list, dataset_element_factory: DatasetElementFactory):
+    """
+    Sometimes the client has in cache an element whose ID has already changed. This happens in the case of a forked
+    element, for example when a value from the original element changed.
+
+    _get_elements_real_id translates old IDs into new IDs if available, for each of the iDs in the list.
+
+    Note that this method guarantees that all the IDs, if elements exist for the current dataset,
+    will be available in the DB.
+
+    :param elements_ids: List of elements ids (wrapped in ObjectId !!)
+    :param dataset_element_factory: factory for managing dataset elements.
+    :return: list of elements (with same order as original) with newest corresponding IDs.
+    """
+
+    # Sometimes the Id of the elements changes, but we can get a conversion dictionary to solve the problem.
+    translation_dict = dataset_element_factory.discover_real_id(elements_ids)
+
+    new_elements_ids = [element_id if element_id not in translation_dict else translation_dict[element_id] for element_id in elements_ids]
+
+    return new_elements_ids
+
+
 class DatasetElements(TokenizedResource):
 
     def __init__(self):
@@ -154,7 +177,7 @@ class DatasetElements(TokenizedResource):
 
         self.session.flush()
 
-        result=str(element._id)
+        result = str(element._id)
 
         return result, 201
 
@@ -191,12 +214,23 @@ class DatasetElementsBundle(TokenizedResource):
 
         dataset = DatasetFactory(token).get_dataset(full_prefix)
 
-        # That json value is required, it is validated by the get_parser; so, it is ensured that key exists in the dict.
-        elements_ids = request.json['elements']
+        dataset_element_factory = DatasetElementFactory(token, dataset)
 
-        elements_info = DatasetElementFactory(token, dataset).get_specific_elements_info([ObjectId(x) for x in elements_ids])
+        # That json value is required, it is validated by the get_parser; so, it is ensured that key exists in the dict.
+        elements_ids = [ObjectId(element_id) for element_id in request.json['elements']]
+
+        new_elements_ids = _get_elements_real_id(elements_ids, dataset_element_factory)
+
+        try:
+            elements_info = dataset_element_factory.get_specific_elements_info(new_elements_ids)
+        except KeyError as e:
+            elements_info = []
+            abort(404, message=str(e)[1:-1])
 
         result = [element.serialize() for element in elements_info]
+
+        # The client has to check for a "previous_id" field in the result.
+        # In case he finds it, he must update his index table to change "previous_id" to "_id".
 
         return result
 
@@ -216,13 +250,17 @@ class DatasetElementsBundle(TokenizedResource):
 
         dataset = DatasetFactory(token).get_dataset(full_prefix)
 
+        dataset_element_factory = DatasetElementFactory(token, dataset)
+
         # That json value is required, it is validated by the get_parser; so, it is ensured that key exists in the dict.
-        elements_ids = request.json['elements']
+        elements_ids = [ObjectId(element_id) for element_id in request.json['elements']]
+
+        new_elements_ids = _get_elements_real_id(elements_ids, dataset_element_factory)
 
         # Note that if no elements are provided (length is 0) then we purge the whole dataset. It is the clear()
         # behavior.
 
-        DatasetElementFactory(token, dataset).destroy_elements([ObjectId(x) for x in elements_ids])
+        dataset_element_factory.destroy_elements(new_elements_ids)
 
         self.session.flush()
 
@@ -269,10 +307,20 @@ class DatasetElementsBundle(TokenizedResource):
 
         dataset = DatasetFactory(token).get_dataset(full_prefix)
 
+        dataset_element_factory = DatasetElementFactory(token, dataset)
+
         # That json value is required, it is validated by the delete_parser; so, it is ensured that key exists in the dict.
         elements_kwargs = request.json['elements']
+        elements_kwargs_preprocessed = {ObjectId(k): v for k, v in elements_kwargs.items()}
 
-        edited_elements = DatasetElementFactory(token, dataset).edit_elements({ObjectId(k): v for k, v in elements_kwargs.items()})
+        # There might be some elements with an old ID. Let's find their new ID
+        elements_ids = list(elements_kwargs_preprocessed.keys())
+        translation_dict = dataset_element_factory.discover_real_id(elements_ids)
+
+        # Now rebuild the elements with the new ids
+        elements_kwargs_postprocessed = {(k if k not in translation_dict else translation_dict[k]): v for k, v in elements_kwargs_preprocessed}
+
+        edited_elements = dataset_element_factory.edit_elements(elements_kwargs_postprocessed)
 
         self.session.flush()
 
@@ -333,7 +381,16 @@ class DatasetElement(TokenizedResource):
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
-        element = DatasetElementFactory(token, dataset).get_element_info(ObjectId(element_id))
+        dataset_element_factory = DatasetElementFactory(token, dataset)
+
+        wrapped_element_id = ObjectId(element_id)
+
+        # Let's translate from a potential old id (like element_id) to the newest ID of this element.
+        # Most of the times, real_element_id is going to be the same as element_id; however there are
+        # certain cases where not: after a modification of a forked element.
+        real_element_id = _get_elements_real_id([wrapped_element_id], dataset_element_factory)[0]
+
+        element = dataset_element_factory.get_element_info(real_element_id)
 
         result = element.serialize()
 
@@ -359,7 +416,16 @@ class DatasetElement(TokenizedResource):
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
-        DatasetElementFactory(token, dataset).edit_element(ObjectId(element_id), **kwargs)
+        dataset_element_factory = DatasetElementFactory(token, dataset)
+
+        wrapped_element_id = ObjectId(element_id)
+
+        # Let's translate from a potential old id (like element_id) to the newest ID of this element.
+        # Most of the times, real_element_id is going to be the same as element_id; however there are
+        # certain cases where not: after a modification of a forked element.
+        real_element_id = _get_elements_real_id([wrapped_element_id], dataset_element_factory)[0]
+
+        dataset_element_factory.edit_element(real_element_id, **kwargs)
 
         self.session.flush()
 
@@ -377,7 +443,16 @@ class DatasetElement(TokenizedResource):
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
-        DatasetElementFactory(token, dataset).destroy_element(ObjectId(element_id))
+        dataset_element_factory = DatasetElementFactory(token, dataset)
+
+        wrapped_element_id = ObjectId(element_id)
+
+        # Let's translate from a potential old id (like element_id) to the newest ID of this element.
+        # Most of the times, real_element_id is going to be the same as element_id; however there are
+        # certain cases where not: after a modification of a forked element.
+        real_element_id = _get_elements_real_id([wrapped_element_id], dataset_element_factory)[0]
+
+        dataset_element_factory.destroy_element(real_element_id)
 
         self.session.flush()
 
@@ -401,7 +476,16 @@ class DatasetElementContent(TokenizedResource):
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
-        content = DatasetElementFactory(token, dataset).get_element_content(ObjectId(element_id))
+        dataset_element_factory = DatasetElementFactory(token, dataset)
+
+        wrapped_element_id = ObjectId(element_id)
+
+        # Let's translate from a potential old id (like element_id) to the newest ID of this element.
+        # Most of the times, real_element_id is going to be the same as element_id; however there are
+        # certain cases where not: after a modification of a forked element.
+        real_element_id = _get_elements_real_id([wrapped_element_id], dataset_element_factory)[0]
+
+        content = dataset_element_factory.get_element_content(real_element_id)
 
         return send_file(BytesIO(content), mimetype="application/octet-stream")
 
@@ -418,8 +502,17 @@ class DatasetElementContent(TokenizedResource):
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
+        dataset_element_factory = DatasetElementFactory(token, dataset)
+
+        wrapped_element_id = ObjectId(element_id)
+
+        # Let's translate from a potential old id (like element_id) to the newest ID of this element.
+        # Most of the times, real_element_id is going to be the same as element_id; however there are
+        # certain cases where not: after a modification of a forked element.
+        real_element_id = _get_elements_real_id([wrapped_element_id], dataset_element_factory)[0]
+
         content = request.stream.read()
-        DatasetElementFactory(token, dataset).edit_element(ObjectId(element_id), content=content)
+        dataset_element_factory.edit_element(real_element_id, content=content)
 
         self.session.flush()
 
@@ -460,11 +553,18 @@ class DatasetElementContentBundle(TokenizedResource):
         if 'elements' in request.json:
             kwargs['elements'] = request.json['elements']  # fast fix for split-bug of the tags.
 
-        elements = kwargs['elements']
+        elements_ids = [ObjectId(id) for id in kwargs['elements']]
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
-        elements_content = DatasetElementFactory(token, dataset).get_elements_content([ObjectId(id) for id in elements])
+        dataset_element_factory = DatasetElementFactory(token, dataset)
+
+        # Let's translate from a potential old id (like element_id) to the newest ID of this element.
+        # Most of the times, real_element_id is going to be the same as element_id; however there are
+        # certain cases where not: after a modification of a forked element.
+        real_elements_ids = _get_elements_real_id(elements_ids, dataset_element_factory)
+
+        elements_content = dataset_element_factory.get_elements_content(real_elements_ids)
 
         packet = PyZip(elements_content)
 
@@ -481,12 +581,23 @@ class DatasetElementContentBundle(TokenizedResource):
         full_dataset_url_prefix = "{}/{}".format(token_prefix, dataset_prefix)
 
         content = request.stream.read()
-        packet = PyZip().from_bytes(content)
+        try:
+            packet = PyZip().from_bytes(content)
+        except Exception:
+            packet = None
+            abort(422, message="The content pushed is not readable. Ensure that your version of DHUB is the latest one.")
 
         dataset = DatasetFactory(token).get_dataset(full_dataset_url_prefix)
 
-        crafted_request = {ObjectId(k): {'content': v} for k, v in packet.items()}
-        DatasetElementFactory(token, dataset).edit_elements(crafted_request)
+        dataset_element_factory = DatasetElementFactory(token, dataset)
+
+        elements_ids = list(packet.keys())
+        translation_dict = dataset_element_factory.discover_real_id(elements_ids)
+
+        # Now rebuild the elements with the new ids
+        elements_kwargs_postprocessed = {(k if k not in translation_dict else translation_dict[k]): {'content': v} for k, v in packet.items()}
+
+        dataset_element_factory.edit_elements(elements_kwargs_postprocessed)
 
         self.session.flush()
 

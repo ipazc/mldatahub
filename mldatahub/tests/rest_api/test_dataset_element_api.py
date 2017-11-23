@@ -35,6 +35,7 @@ from mldatahub.config.privileges import Privileges
 
 __author__ = 'Iván de Paz Centeno'
 
+
 def run_server():
     global_config.set_page_size(100)
     build_app().run("localhost", 17114)
@@ -101,65 +102,166 @@ class TestDatasetElementAPI(unittest.TestCase):
 
         self.assertEqual(len(dataset), 3)
 
-        self.assertEqual(dataset[0].get_content(), b"content1")
-        self.assertEqual(dataset[1].get_content(), b"content2")
-        self.assertEqual(dataset[2].get_content(), b"content3")
+        e1 = dataset[0]  # Type: Element
+        e2 = dataset[1]  # Type: Element
+        e3 = dataset[2]  # Type: Element
 
+        self.assertEqual(e1.get_content(), b"content1")
+        self.assertEqual(e2.get_content(), b"content2")
+        self.assertEqual(e3.get_content(), b"content3")
+
+        self.assertEqual(e1.get_title(), "element1")
+        self.assertEqual(e2.get_title(), "element2")
+        self.assertEqual(e3.get_title(), "element3")
+
+        self.assertEqual(e1.get_description(), "No description1")
+        self.assertEqual(e2.get_description(), "No description2")
+        self.assertEqual(e3.get_description(), "No description3")
+
+        self.assertEqual(e1.get_tags(), [{"tag": "hi"}])
+        self.assertEqual(e2.get_tags(), [{"tag": "ho"}])
+        self.assertEqual(e3.get_tags(), [{"tag": "hi"}])
 
     @wait_http_deployment
-    def test_dataset_creation(self):
+    def test_dataset_elements_iterate(self):
         """
-        Dataset can be created from API
+        Dataset elements can be iterated through API
         """
         datasets = Datasets(token_id=self.token_guid, api_url="http://localhost:17114")
         dataset = datasets.add_dataset("dataset1")
 
-        self.assertEqual(str(datasets), "['example/dataset1']")
-        self.assertEqual(len(datasets), 1)
-        self.assertEqual(dataset.get_url_prefix(), "example/dataset1")
         self.assertEqual(len(dataset), 0)
 
-        dataset2 = datasets.add_dataset("dataset2", title="This is dataset2", description="Now with description",
-                                        reference="No reference", tags=["one", "two"])
+        e1 = dataset.add_element(title="element1", content=b"content1", description="No description1", tags=[{"tag": "hi"}])
+        e2 = dataset.add_element(title="element2", content=b"content2", description="No description2", tags=[{"tag": "ho"}])
+        e3 = dataset.add_element(title="element3", content=b"content3", description="No description3", tags=[{"tag": "hi"}])
 
-        self.assertEqual(dataset2.get_url_prefix(), "example/dataset2")
-        self.assertEqual(dataset2.get_title(), "This is dataset2")
-        self.assertEqual(dataset2.get_description(), "Now with description")
-        self.assertEqual(dataset2.get_tags(), ["one", "two"])
+        dataset.sync(False)
 
-        dataset2.set_tags(["three", "four"])
-        self.assertEqual(dataset2.get_tags(), ["three", "four"])
+        self.assertEqual(len(dataset), 3)
+        order = [e1, e2, e3]
 
-        dataset2 = datasets['dataset2']
-        dataset2_1 = datasets['example/dataset2']
+        for element, e in zip(dataset, order):
+            self.assertEqual(e.get_title(), element.get_title())
+            self.assertEqual(e.get_description(), element.get_description())
+            self.assertEqual(e.get_tags(), element.get_tags())
 
-        self.assertEqual(dataset2, dataset2_1)
+        for element, e in zip(dataset.filter_iter(cache_content=True), order):
+            self.assertEqual(e.get_title(), element.get_title())
+            self.assertEqual(e.get_description(), element.get_description())
+            self.assertEqual(e.get_content(), element.get_content())
+            self.assertEqual(e.get_tags(), element.get_tags())
 
-        dataset2.set_title("asd123")
-        dataset2.set_description("testing_description")
-
-        self.assertEqual(dataset2.get_title(), "asd123")
-        self.assertEqual(dataset2.get_description(), "testing_description")
-        dataset2.update()
-        datasets2 = Datasets(token_id=self.token_guid, api_url="http://localhost:17114")
-        dataset2 = datasets2['example/dataset2']
-
-        self.assertEqual(dataset2.get_title(), "asd123")
-        self.assertEqual(dataset2.get_description(), "testing_description")
+        for element in dataset.filter_iter(options={'tags': {'tag': 'hi'}}):
+            self.assertEqual(element.get_tags(), [{'tag': 'hi'}])
 
     @wait_http_deployment
-    def test_dataset_removal(self):
+    def test_elements_indexes(self):
         """
-        Dataset can be removed from API
+        Dataset elements can be indexed in several ways through API
         """
         datasets = Datasets(token_id=self.token_guid, api_url="http://localhost:17114")
         dataset = datasets.add_dataset("dataset1")
 
-        self.assertEqual(str(datasets), "['example/dataset1']")
-        self.assertEqual(len(datasets), 1)
-        del dataset
-        self.assertEqual(str(datasets), "[]")
-        self.assertEqual(len(datasets), 0)
+        self.assertEqual(len(dataset), 0)
+
+        e1 = dataset.add_element(title="element1", content=b"content1", description="No description1", tags=[{"tag": "hi"}])
+        e2 = dataset.add_element(title="element2", content=b"content2", description="No description2", tags=[{"tag": "ho"}])
+        e3 = dataset.add_element(title="element3", content=b"content3", description="No description3", tags=[{"tag": "hi"}])
+
+        dataset.sync(False)
+
+        self.assertEqual(len(dataset), 3)
+
+        self.assertEqual(dataset[0].get_title(), e1.get_title())
+        self.assertEqual(dataset[-1].get_title(), e3.get_title())
+        self.assertEqual(dataset[e2.get_id()].get_title(), e2.get_title())
+        self.assertEqual(dataset[{'tags': {'tag': 'hi'}}].get_title(), e1.get_title())
+        self.assertEqual(dataset[{'tags': {'tag': 'ho'}}].get_title(), e2.get_title())
+
+    @wait_http_deployment
+    def test_elements_removal(self):
+        """
+        Dataset elements can be removed through API
+        """
+        datasets = Datasets(token_id=self.token_guid, api_url="http://localhost:17114")
+        dataset = datasets.add_dataset("dataset1")
+
+        self.assertEqual(len(dataset), 0)
+
+        e1 = dataset.add_element(title="element1", content=b"content1", description="No description1", tags=[{"tag": "hi"}])
+        e2 = dataset.add_element(title="element2", content=b"content2", description="No description2", tags=[{"tag": "ho"}])
+        e3 = dataset.add_element(title="element3", content=b"content3", description="No description3", tags=[{"tag": "hi"}])
+
+        dataset.sync(False)
+
+        self.assertEqual(len(dataset), 3)
+
+        del dataset[e1.get_id()]
+        self.assertEqual(len(dataset), 2)
+        with self.assertRaises(KeyError):
+            value = dataset[e1.get_id()]
+
+        del dataset[0]
+        self.assertEqual(len(dataset), 1)
+        del dataset[{'tags':{"tag": "hi"}}]
+        self.assertEqual(len(dataset), 0)
+
+        e1 = dataset.add_element(title="element1", content=b"content1", description="No description1", tags=[{"tag": "hi"}])
+        e2 = dataset.add_element(title="element2", content=b"content2", description="No description2", tags=[{"tag": "ho"}])
+        e3 = dataset.add_element(title="element3", content=b"content3", description="No description3", tags=[{"tag": "hi"}])
+
+        dataset.sync(False)
+
+        self.assertEqual(len(dataset), 3)
+
+        dataset.clear()
+        self.assertEqual(len(dataset), 0)
+
+    @wait_http_deployment
+    def test_dataset_fork(self):
+        """
+        Dataset can be forked, with elements, through API.
+        :return:
+        """
+        datasets = Datasets(token_id=self.token_guid, api_url="http://localhost:17114")
+        dataset = datasets.add_dataset("dataset1")
+
+        self.assertEqual(len(dataset), 0)
+
+        e1 = dataset.add_element(title="element1", content=b"content1", description="No description1", tags=[{"tag": "hi"}])
+        e2 = dataset.add_element(title="element2", content=b"content2", description="No description2", tags=[{"tag": "ho"}])
+        e3 = dataset.add_element(title="element3", content=b"content3", description="No description3", tags=[{"tag": "hi"}])
+
+        dataset.sync(False)
+
+        self.assertEqual(len(dataset), 3)
+        self.assertEqual(int(dataset.get_fork_count()), 0)
+
+        fork = dataset.fork("dataset2")  # type: Dataset
+        dataset.refresh()
+        self.assertEqual(len(fork), 3)
+        self.assertNotEqual(fork.get_url_prefix(), dataset.get_url_prefix())
+        self.assertEqual(fork.get_fork_father(), dataset.get_url_prefix())
+        self.assertEqual(int(dataset.get_fork_count()), 1)
+
+        self.assertEqual(dataset[0].get_title(), fork[0].get_title())
+        self.assertEqual(dataset[1].get_title(), fork[1].get_title())
+        self.assertEqual(dataset[2].get_title(), fork[2].get_title())
+
+        self.assertEqual(dataset[0].get_id(), fork[0].get_id())
+
+        element = fork[0]
+        element2 = fork[1]
+        self.assertEqual(fork[0].get_content(), dataset[0].get_content())
+        self.assertEqual(element.get_content(), dataset[0].get_content())
+        element.set_title("hi")
+        element2.set_title("hi2")
+        self.assertEqual(element.get_title(), "hi")
+        self.assertEqual(fork[0].get_title(), "hi")
+        self.assertEqual(fork[0].get_content(), dataset[0].get_content())
+        self.assertEqual(element.get_content(), dataset[0].get_content())
+        self.assertNotEqual(fork[0].get_id(), dataset[0].get_id())
 
     def tearDown(self):
         purge_database()

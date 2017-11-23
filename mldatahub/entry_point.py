@@ -161,6 +161,9 @@ def build_app():
     from mldatahub.api.token import Tokens, Token, TokenLinker
 
     app = Flask(__name__)
+    app.config['DEBUG'] = False
+    app.config['ERROR_404_HELP'] = False
+
     api = Api(app)
 
     api.add_resource(Server, '/server')

@@ -939,7 +939,47 @@ class TestDatasetElementFactory(unittest.TestCase):
         self.assertEqual(main_dataset.elements[2].title, "t2")
         self.assertEqual(main_dataset.elements[3].title, "t3")
 
+    def test_dataset_discover_new_ids_for_changed_ids_of_elements(self):
+        """
+        The IDs of the elements modified from a forked dataset can be discovered from old ID.
+        :return:
+        """
+        editor = TokenDAO("normal user privileged with link", 100, 200, "user1",
+                     privileges=Privileges.RO_WATCH_DATASET + Privileges.CREATE_DATASET + Privileges.EDIT_DATASET +
+                                Privileges.ADD_ELEMENTS + Privileges.EDIT_ELEMENTS + Privileges.DESTROY_ELEMENTS
+                 )
 
+        main_dataset = DatasetFactory(editor).create_dataset(url_prefix="foobar", title="foo", description="bar",
+                                                             reference="none", tags=["a"])
+
+        editor = editor.link_dataset(main_dataset)
+
+        elements_proto = [{
+            'title': 't{}'.format(i),
+            'description': 'desc{}'.format(i),
+            'http_ref': 'none',
+            'tags': ['none'],
+            'content': "content{}".format(i).encode()
+        } for i in range(4)]
+
+        elements = [DatasetElementFactory(editor, main_dataset).create_element(**element_proto) for element_proto in elements_proto]
+        self.session.flush()
+
+        self.assertEqual(len(elements), len(main_dataset.elements))
+        forked_dataset = DatasetFactory(editor).fork_dataset(main_dataset.url_prefix, editor, url_prefix="foo")
+        editor.link_dataset(forked_dataset)
+        self.session.flush()
+        self.assertEqual(len(forked_dataset.elements), len(main_dataset.elements))
+
+        previous_id = forked_dataset.elements[0]._id
+
+        DatasetElementFactory(editor, forked_dataset).edit_element(forked_dataset.elements[0]._id, title="edited")
+        print(forked_dataset.elements[0]._id)
+
+        result = DatasetElementFactory(editor, forked_dataset).discover_real_id([previous_id])
+        print(result)
+
+        print(forked_dataset.elements[0].title)
 
     def tearDown(self):
         DatasetDAO.query.remove()

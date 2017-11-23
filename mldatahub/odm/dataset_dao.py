@@ -172,6 +172,7 @@ class DatasetElementDAO(MappedClass):
         name = 'element'
 
     _id = FieldProperty(schema.ObjectId)
+    _previous_id = FieldProperty(schema.ObjectId)
     title = FieldProperty(schema.String)
     description = FieldProperty(schema.String)
     file_ref_id = ForeignIdProperty('FileDAO')
@@ -196,6 +197,7 @@ class DatasetElementDAO(MappedClass):
             dataset_id = [dataset._id]
 
         kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__", "datasets"]}
+        kwargs['_previous_id'] = None
         super().__init__(**kwargs)
 
     def get_comments(self, options=None):
@@ -246,18 +248,24 @@ class DatasetElementDAO(MappedClass):
                   "http_ref"]
 
         response = {f: str(self[f]) for f in fields}
+
+        if self._previous_id is not None:
+            response['previous_id'] = self._previous_id
+
         response['comments_count'] = len(self.comments)
         response['has_content'] = self.file_ref_id is not None
         response['tags'] = [t for t in self.tags]
         return response
 
-    def clone(self, dataset_id=None):
-        if dataset_id is None:
-            dataset_id = self._id
+    def clone(self, dataset_id):
 
-        return DatasetElementDAO(title=self.title, description=self.description, file_ref_id=self.file_ref_id,
+        element = DatasetElementDAO(title=self.title, description=self.description, file_ref_id=self.file_ref_id,
                                  http_ref=self.http_ref, tags=self.tags, addition_date=self.addition_date,
                                  modification_date=self.modification_date, dataset_id=[dataset_id])
+
+        element._previous_id = self._id
+
+        return element
 
     def delete(self, owner_id:ObjectId=None):
         try:
@@ -276,6 +284,7 @@ class DatasetElementDAO(MappedClass):
         except Exception as ex:
             DatasetElementCommentDAO.query.remove({'element_id': self._id})
             DatasetElementDAO.query.remove({'_id': self._id})
+
 
 class DatasetCommentDAO(MappedClass):
 
