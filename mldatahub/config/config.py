@@ -29,7 +29,9 @@ from mldatahub.log.logger import Logger
 
 __author__ = 'Iván de Paz Centeno'
 
+
 logger = Logger("Config")
+
 e = logger.error
 w = logger.warning
 d = logger.debug

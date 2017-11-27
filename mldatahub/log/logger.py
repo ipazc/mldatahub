@@ -21,8 +21,10 @@
 # MA  02110-1301, USA.
 
 from mldatahub.helper.timing_helper import now
+from mldatahub.log.file_log import file_logger
 
 __author__ = 'Iván de Paz Centeno'
+
 
 
 class verbose_levels():
@@ -31,15 +33,8 @@ class verbose_levels():
     WARNING = 3
     DEBUG   = 4
 
-try:
-    from mldatahub.config.config import global_config
-    VERBOSE_LEVEL = getattr(verbose_levels, global_config.get_log_verbosity())
-    LOG_FILE = global_config.get_log_file()
-except ImportError:
-    VERBOSE_LEVEL = verbose_levels.DEBUG
-    LOG_FILE = None
 
-def verbose_level(v_level:int):
+def verbose_level(v_level: int):
     """
     Decorator for setting the verbosity level for a given log function.
     :param v_level: verbose level from 1 to N.
@@ -47,7 +42,8 @@ def verbose_level(v_level:int):
     """
     def wrapper(func):
         def wrapper2(*args, **kwargs):
-            if 0 < v_level <= VERBOSE_LEVEL:
+            instance = args[0]
+            if 0 < v_level <= instance.verbosity_level:
                 result = func(*args, **kwargs)
             else:
                 result = None
@@ -62,16 +58,25 @@ class Logger(object):
     Logger class for MLDataHub.
     """
 
-    def __init__(self, module_name="MAIN", show_timestamp=True):
+    def __init__(self, module_name="MAIN", show_timestamp=True, verbosity_level=verbose_levels.DEBUG, log_file=None):
         """
         Constructor of the logger class.
         :param module_name: prefix for each of the log messages.
         :param show_timestamp: flag to show the time stamp.
+        :param verbosity_level: verbose level to output (Check the verbose_levels meta class).
+        :param log_file: file to output the logs.
         :return:
         """
+        if type(verbosity_level) is str:
+            self.verbosity_level = getattr(verbose_levels, verbosity_level)
+        else:
+            self.verbosity_level = verbosity_level
+
         self.module_name = module_name
         self.show_timestamp = show_timestamp
-        self.log_file = LOG_FILE
+        self.log_file = log_file
+        self.file_logger = file_logger
+        self.file_logger.set_file_uri(self.log_file)
 
     def __generate_main_message__(self, level: str="INFO"):
         """
@@ -111,4 +116,6 @@ class Logger(object):
 
     def __output__(self, level, same_line, string):
         end = "" if same_line else "\n"
-        print(self.__generate_main_message__(level).format(self.module_name, string), end=end, flush=True)
+        line = self.__generate_main_message__(level).format(self.module_name, string)
+        self.file_logger.queue_line(line+end, same_line)
+        print(line, end=end, flush=True)

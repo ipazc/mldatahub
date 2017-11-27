@@ -31,7 +31,9 @@ from mldatahub.odm.dataset_dao import DatasetElementDAO
 
 TIMER_TICK = global_config.get_garbage_collector_timer_interval()  # seconds
 
-logger = Logger("GC")
+logger = Logger("GC",
+                verbosity_level=global_config.get_log_verbosity(),
+                log_file=global_config.get_log_file())
 
 i = logger.info
 d = logger.debug
