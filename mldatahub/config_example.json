@@ -5,7 +5,7 @@
   "#":"Log file",
   "log_file_uri": "$HOME/mldatahub.log",
 
-  "#":"Log Verbosity",
+  "#":"Log Verbosity (Possibilities: ERROR, INFO, WARNING or DEBUG)",
   "log_verbosity": "DEBUG",
 
   "#":"Max number of accesses to allow in less than 'access_reset_time' seconds before blocking the connection.",

@@ -62,8 +62,13 @@ class GlobalConfig(object):
         example_config_route = []
 
         for config_route in config_routes:
-            pyfolder = PyFolder(config_route)
-            example_config_route = pyfolder.index("config_example.json", 3)
+            try:
+                pyfolder = PyFolder(config_route)
+                example_config_route = pyfolder.index("config_example.json", 3)
+
+            except PermissionError:
+                w("Not permission to access the folder {}".format(config_route))
+                pass
 
             if len(example_config_route) > 0:
                 break
@@ -154,11 +159,11 @@ class GlobalConfig(object):
         Loads the config from the config.json file.
         Usually, this file is located at /etc/mldatahub/
         """
-        pyfolder = PyFolder(DEFAULT_CONFIG_ROUTE)
-
         try:
+            pyfolder = PyFolder(DEFAULT_CONFIG_ROUTE)
             self.config_values = pyfolder['config.json']
-
+        except PermissionError as ex:
+            w("There is no permission to access the config file. Running on default values.")
         except KeyError as ex:
             w("Config file not found. Running on default values.")
 
