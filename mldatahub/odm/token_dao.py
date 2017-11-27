@@ -23,8 +23,8 @@
 import uuid
 
 from bson import ObjectId
-from mldatahub.helper.timing_helper import now
-from mldatahub.config.config import global_config, token_future_end
+from mldatahub.helper.timing_helper import now, token_future_end
+from mldatahub.config.config import global_config
 from ming import schema
 from ming.odm import Mapper, ForeignIdProperty, MappedClass, FieldProperty
 from mldatahub.config.privileges import Privileges

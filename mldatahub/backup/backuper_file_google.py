@@ -279,7 +279,7 @@ class BackuperGoogle(object):
 
         self.decrease_tasks_count(len(packet))
 
-    def backup_file(self, file_id:ObjectId):
+    def backup_file(self, file_id: ObjectId):
         """
         Saves the specified file into Google Drive
         :param file:
@@ -298,7 +298,6 @@ class BackuperGoogle(object):
             tasks_remaining = self.tasks_count
             sleep(0.5)
         v("Tasks remaining: {}".format(tasks_remaining), same_line=False)
-
 
     def restore_file(self, file_id:ObjectId):
         """

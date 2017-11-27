@@ -21,8 +21,9 @@
 # MA  02110-1301, USA.
 
 from flask_restful import abort
-from mldatahub.config.config import global_config, now
+from mldatahub.config.config import global_config
 from mldatahub.config.privileges import Privileges
+from mldatahub.helper.timing_helper import now
 from mldatahub.odm.dataset_dao import DatasetDAO
 from mldatahub.odm.token_dao import TokenDAO
 

@@ -22,33 +22,98 @@
 
 import json
 import os
-from dateutil.relativedelta import relativedelta
+from functools import partial
 from ming import create_datastore
 from ming.odm import ThreadLocalODMSession
-from mldatahub.helper.timing_helper import now
 
 __author__ = 'Iván de Paz Centeno'
 
 HOME = os.path.expanduser("~")
+DEFAULT_CONFIG_ROUTE = "/etc/mldatahub/config.json"
 
-def token_future_end():
-    return now() + relativedelta(years=+500)
 
 class GlobalConfig(object):
+    # Special keys that cannot be set in the config """
+    __forbidden_keys = {"log_file", "session", "storage"}
 
-    def __init__(self, config_values=None):
-        if config_values is None:
-            config_values = {}
+    # Current config
+    __config = {}
+    __storage = None
+    __session = None
 
-        self.config_values = config_values
-        self.session = None
-        self.storage = None
-
+    def __init__(self):
+        # Default configuration
+        self.__default_config = {
+            "host": "localhost",
+            "port": 5555,
+            "log_file_uri": "$HOME/mldatahub.log",
+            "session_uri": "mongodb://localhost:27017/mldatahub",
+            "max_access_times": 250,
+            "access_reset_time": 1,  # seconds
+            "page_size": 100,  # elements
+            "garbage_collector_timer_interval": 600,  # seconds
+            "file_size_limit": 16*1024*1024,   #  16 MB
+            "google_drive_folder": "mldatahub/",
+            "session": self.__get_session__,
+            "storage": self.__get_storage__,
+            "log_file": self.__get_log_file,
+        }
         self.load_from_file()
+
+    def __get_log_file(self):
+        return self.get_log_file_uri().replace("$HOME", HOME)
+
+    def __get_session__(self):
+        if self.__session is None:
+            self.__session = ThreadLocalODMSession(bind=create_datastore(self.get_session_uri()))
+        return self.__session
+
+    def __get_storage__(self):
+        if self.__storage is None:
+            from mldatahub.storage.remote.mongo_storage import MongoStorage
+            self.__storage = MongoStorage()
+
+        return self.__storage
+
+    def __read_config__(self, key):
+        """
+        Reads the key from the current config.
+        :param key: key to read.
+        :return: config result
+        """
+        if key in self.__forbidden_keys:
+            result = self.__default_config[key]()
+        else:
+            if key in self.__config:
+                result = self.__config[key]
+            else:
+                result = self.__default_config[key]
+
+        return result
+
+    def __put_config__(self, key, value):
+        """
+        Sets a value for the current config
+        :param key:
+        :param value:
+        :return:
+        """
+        self.__config[key] = value
+
+    def __getattr__(self, item):
+
+        if item.startswith("set"):
+            result = partial(self.__put_config__, item.replace("set_", ""))
+        elif item.startswith("get"):
+            result = partial(self.__read_config__, item.replace("get_", ""))
+        else:
+            raise Exception("'{}' not valid. Only getters and setters available. Try with get_[config_option] or set_[config_option](value)".format(item))
+
+        return result
 
     def load_from_file(self):
         try:
-            with open("/etc/mldatahub/config.json") as f:
+            with open(DEFAULT_CONFIG_ROUTE) as f:
                 self.config_values = json.load(f)
 
         except FileNotFoundError as ex:
@@ -58,95 +123,5 @@ class GlobalConfig(object):
         for k, v in self.config_values.items():
             if not k.startswith("#"):
                 print("{}: {}".format(k, v))
-
-    def set_host(self, new_host):
-        self.config_values['host'] = new_host
-
-    def set_port(self, new_port):
-        self.config_values['port'] = new_port
-
-    def set_session_uri(self, new_uri):
-        self.config_values['session_uri'] = new_uri
-
-    def set_page_size(self, new_page_size):
-        self.config_values['page_size'] = new_page_size
-
-    def set_garbage_collector_timer_interval(self, new_interval):
-        self.config_values['garbage_collector_time_interval'] = new_interval
-
-    def set_max_access_times(self, new_max_access_times):
-        self.config_values['new_max_access_times'] = new_max_access_times
-
-    def set_access_reset_time(self, new_access_reset_time):
-        self.config_values['access_reset_time'] = new_access_reset_time
-
-    def set_file_size_limit(self, new_file_size_limit):
-        self.config_values['file_size_limit'] = new_file_size_limit
-
-    def set_google_drive_folder(self, google_drive_folder):
-        self.config_values['google_drive_folder'] = google_drive_folder
-
-    def get_host(self):
-        if 'host' not in self.config_values:
-            self.set_host("localhost")
-
-        return self.config_values['host']
-
-    def get_port(self):
-        if 'port' not in self.config_values:
-            self.set_port("5555")
-
-        return int(self.config_values['port'])
-
-    def get_session_uri(self):
-        if 'session_uri' not in self.config_values:
-            self.set_session_uri("mongodb://localhost:27017/mldatahub")
-
-        return self.config_values['session_uri']
-
-    def get_session(self):
-        if 'session_uri' not in self.config_values:
-            self.set_session_uri("mongodb://localhost:27017/mldatahub")
-
-        if self.session is None:
-            self.session = ThreadLocalODMSession(bind=create_datastore(self.config_values['session_uri']))
-        return self.session
-
-    def get_storage(self):
-        if self.storage is None:
-            from mldatahub.storage.remote.mongo_storage import MongoStorage
-            self.storage = MongoStorage()
-
-        return self.storage
-
-    def get_max_access_times(self):
-        if 'max_access_times' not in self.config_values:
-            self.config_values['max_access_times'] = 250
-        return self.config_values['max_access_times']
-
-    def get_access_reset_time(self):
-        if 'access_reset_time' not in self.config_values:
-            self.config_values['access_reset_time'] = 1  # seconds
-        return self.config_values['access_reset_time']
-
-    def get_page_size(self):
-        if 'page_size' not in self.config_values:
-            self.config_values['page_size'] = 100  # 100 elements per page
-        return self.config_values['page_size']
-
-    def get_garbage_collector_timer_interval(self):
-        if 'garbage_collector_time_interval' not in self.config_values:
-            self.config_values['garbage_collector_time_interval'] = 600  # 10 minutes
-        return self.config_values['garbage_collector_time_interval']
-
-    def get_file_size_limit(self):
-        if 'file_size_limit' not in self.config_values:
-            self.config_values['file_size_limit'] = 16*1024*1024  # 16 MB
-        return self.config_values['file_size_limit']
-
-    def get_google_drive_folder(self):
-        if 'google_drive_folder' not in self.config_values:
-            self.config_values['google_drive_folder'] = "mldatahub/"
-        return self.config_values['google_drive_folder']
 
 global_config = GlobalConfig()
