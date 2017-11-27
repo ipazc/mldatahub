@@ -26,15 +26,37 @@ from time import sleep
 import datetime
 from mldatahub.helper.timing_helper import now, Measure, time_left_as_str
 from mldatahub.config.config import global_config
+from mldatahub.log.logger import Logger
 from mldatahub.odm.dataset_dao import DatasetElementDAO
 
 TIMER_TICK = global_config.get_garbage_collector_timer_interval()  # seconds
 
+logger = Logger("GC")
+
+i = logger.info
+d = logger.debug
+e = logger.error
+w = logger.warning
+
 __author__ = 'Iván de Paz Centeno'
 
 
-def segment(l, count):
-    b = 0
+def segments(l, count):
+    """
+    Segments a list in N slides of "count" size.
+
+    Example:
+
+        >>> for segment in segments([1,2,3,4,5], 2):
+        >>>    print(segment)
+        [1, 2]
+        [3, 4]
+        [5]
+
+    :param l: list to segments
+    :param count: size of each segments. Last segments might have less elements than specified here.
+    :return: Generator for each segments.
+    """
     blocks = len(l) // count
     for b in range(blocks):
         yield l[b*count:(b+1)*count]
@@ -44,8 +66,8 @@ def segment(l, count):
 
 
 def progress(current, max, string):
-    print("\r[{:05.2f}%] {}/{} - {}                  "
-          "".format(round(current/max * 100, 2), current, max, string), end="", flush=True)
+    i("[{:05.2f}%] {}/{} - {}                  ".format(round(current/max * 100, 2), current, max, string),
+      same_line=True)
 
 
 class GarbageCollector(object):
@@ -80,7 +102,7 @@ class GarbageCollector(object):
 
                 self.do_garbage_collect()
             sleep(1)
-        print("[GC] Exited.")
+        i("[GC] Exited.")
 
     def collect_unused_files(self):
         """
@@ -91,7 +113,7 @@ class GarbageCollector(object):
 
         files_count = len(self.storage)
 
-        print("[GC] {} files to be checked.".format(files_count))
+        i("[GC] {} files to be checked.".format(files_count))
 
         sleep_batch=50
         files_per_second = [0]
@@ -121,11 +143,11 @@ class GarbageCollector(object):
 
                 progress(index+1, files_count, "{} files are orphan.{}".format(len(unused_files), time_remaining))
 
-        print("")
+        i("")
         return unused_files
 
     def do_garbage_collect(self):
-        print("[GC] Collecting garbage...")
+        i("[GC] Collecting garbage...")
 
         global_config.get_session().clear()
 
@@ -135,9 +157,9 @@ class GarbageCollector(object):
         # 2. We check how many unused files are in common with the previous unused files.
         new_unused_files = []
         remove_files = []
-        print("[GC] Comparing {} unused files to previous {} unused files.".format(len(unused_files), len(self.previous_unused_files)))
+        i("[GC] Comparing {} unused files to previous {} unused files.".format(len(unused_files), len(self.previous_unused_files)))
 
-        print("[GC] Cleaning {} elements...".format(len(remove_files)))
+        i("[GC] Cleaning {} elements...".format(len(remove_files)))
 
         for index, file in enumerate(unused_files):
             if file in self.previous_unused_files:
@@ -147,7 +169,7 @@ class GarbageCollector(object):
 
         # 3. We delete by batches
         files_count = 0
-        for list_ids in segment(remove_files, 50):
+        for list_ids in segments(remove_files, 50):
             files_count += len(list_ids)
             self.storage.delete_files(list_ids)
             progress(files_count, len(remove_files), "{} files garbage collected.".format(files_count))
@@ -155,7 +177,7 @@ class GarbageCollector(object):
 
         self.previous_unused_files = set(new_unused_files)
 
-        print("[GC] Cleaned {} elements...".format(len(remove_files)))
+        i("[GC] Cleaned {} elements...".format(len(remove_files)))
 
         return files_count
 

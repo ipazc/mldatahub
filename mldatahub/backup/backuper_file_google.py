@@ -36,32 +36,21 @@ __author__ = 'Iván de Paz Centeno'
 
 
 UPLOAD_TIME = DOWNLOAD_TIME = 1  # seconds
-VERBOSE=1
+VERBOSE = 1
 
-def v(string, same_line=False):
-    if 0 < VERBOSE <= 1:
-        if same_line: end = ""
-        else:   end = "\n"
 
-        print("\r[BAK-GOOGLE] {}     ".format(string), end=end, flush=True)
-
-def i(string):
-    if 0 < VERBOSE <= 2:
-        print("[BAK-GOOGLE] {}".format(string))
 
 def as_bytes(c):
 
     if type(c) is dict or type(c) is list:
         result = json.dumps(c).encode()
-    elif type(c) is str:
-        result = c.encode()
     else:
         result = str(c).encode()
 
     return result
 
 
-class BackuperGoogle(object):
+class BackuperFileGoogle(object):
 
     __tasks_num = 0
     __lock = Lock()

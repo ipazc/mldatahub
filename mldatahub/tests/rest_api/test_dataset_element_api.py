@@ -262,6 +262,7 @@ class TestDatasetElementAPI(unittest.TestCase):
         self.assertEqual(fork[0].get_content(), dataset[0].get_content())
         self.assertEqual(element.get_content(), dataset[0].get_content())
         self.assertNotEqual(fork[0].get_id(), dataset[0].get_id())
+        self.assertNotEqual(dataset[0].get_title(), fork[0].get_title())
 
     def tearDown(self):
         purge_database()

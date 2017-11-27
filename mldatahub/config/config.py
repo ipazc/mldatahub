@@ -20,20 +20,30 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import json
 import os
 from functools import partial
 from ming import create_datastore
 from ming.odm import ThreadLocalODMSession
+from pyfolder import PyFolder
+from mldatahub.log.logger import Logger
 
 __author__ = 'Iván de Paz Centeno'
 
+logger = Logger("Config")
+e = logger.error
+w = logger.warning
+d = logger.debug
+i = logger.info
+
 HOME = os.path.expanduser("~")
-DEFAULT_CONFIG_ROUTE = "/etc/mldatahub/config.json"
+DEFAULT_CONFIG_ROUTE = "/etc/mldatahub/"
 
 
 class GlobalConfig(object):
-    # Special keys that cannot be set in the config """
+    """
+    Represents a configuration object, as a Singleton for several options.
+    """
+    # Special keys that cannot be set in the config
     __forbidden_keys = {"log_file", "session", "storage"}
 
     # Current config
@@ -42,33 +52,52 @@ class GlobalConfig(object):
     __session = None
 
     def __init__(self):
+        """
+        Initializer of the class.
+        """
         # Default configuration
-        self.__default_config = {
-            "host": "localhost",
-            "port": 5555,
-            "log_file_uri": "$HOME/mldatahub.log",
-            "session_uri": "mongodb://localhost:27017/mldatahub",
-            "max_access_times": 250,
-            "access_reset_time": 1,  # seconds
-            "page_size": 100,  # elements
-            "garbage_collector_timer_interval": 600,  # seconds
-            "file_size_limit": 16*1024*1024,   #  16 MB
-            "google_drive_folder": "mldatahub/",
-            "session": self.__get_session__,
-            "storage": self.__get_storage__,
-            "log_file": self.__get_log_file,
-        }
+
+        config_routes = [".", DEFAULT_CONFIG_ROUTE]
+        pyfolder = None
+        example_config_route = []
+
+        for config_route in config_routes:
+            pyfolder = PyFolder(config_route)
+            example_config_route = pyfolder.index("config_example.json", 3)
+
+            if len(example_config_route) > 0:
+                break
+
+        if len(example_config_route) == 0 or pyfolder is None:
+            e("Example config (config_example.json) could not be found. Aborting execution.")
+            exit(-1)
+
+        # We take the default config from the example file itself.
+        self.__default_config = pyfolder[example_config_route[0]]
+        self.__default_config["session"] = self.__get_session__
+        self.__default_config["storage"] = self.__get_storage__
+        self.__default_config["log_file"] = self.__get_log_file
+
         self.load_from_file()
 
     def __get_log_file(self):
+        """
+        :return: Log file used to store the logs.
+        """
         return self.get_log_file_uri().replace("$HOME", HOME)
 
     def __get_session__(self):
+        """
+        :return: ODM Session used by ODM classes.
+        """
         if self.__session is None:
             self.__session = ThreadLocalODMSession(bind=create_datastore(self.get_session_uri()))
         return self.__session
 
     def __get_storage__(self):
+        """
+        :return: storage used to save/retrieve files' contents.
+        """
         if self.__storage is None:
             from mldatahub.storage.remote.mongo_storage import MongoStorage
             self.__storage = MongoStorage()
@@ -101,7 +130,16 @@ class GlobalConfig(object):
         self.__config[key] = value
 
     def __getattr__(self, item):
+        """
+        Proxy for getters and setters.
+        :param item: get_[configuration_option] or set_[configuration_option]. Example:
 
+            get_host
+            set_port
+
+        it maps the item to the contents of the config dict, but also adds some functionality on certain getters.
+        :return:
+        """
         if item.startswith("set"):
             result = partial(self.__put_config__, item.replace("set_", ""))
         elif item.startswith("get"):
@@ -112,16 +150,34 @@ class GlobalConfig(object):
         return result
 
     def load_from_file(self):
+        """
+        Loads the config from the config.json file.
+        Usually, this file is located at /etc/mldatahub/
+        """
+        pyfolder = PyFolder(DEFAULT_CONFIG_ROUTE)
+
         try:
-            with open(DEFAULT_CONFIG_ROUTE) as f:
-                self.config_values = json.load(f)
+            self.config_values = pyfolder['config.json']
 
-        except FileNotFoundError as ex:
-            print("Config file not found. Running on default values.")
+        except KeyError as ex:
+            w("Config file not found. Running on default values.")
 
-    def print_config(self):
+    def __str__(self):
+        """
+        Makes a string representation of the config. Each key is printed with its corresponding value.
+        """
+        result = ""
         for k, v in self.config_values.items():
             if not k.startswith("#"):
-                print("{}: {}".format(k, v))
+                result += "{}: {}\n".format(k, v)
 
+        return result
+
+    def print_config(self):
+        """
+        Prints this config to the stdout.
+        """
+        print(self)
+
+# Singleton object.
 global_config = GlobalConfig()
