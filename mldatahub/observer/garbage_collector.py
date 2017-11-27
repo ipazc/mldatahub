@@ -23,7 +23,6 @@
 import threading
 from threading import Thread
 from time import sleep
-
 import datetime
 from mldatahub.helper.timing_helper import now, Measure, time_left_as_str
 from mldatahub.config.config import global_config
@@ -33,6 +32,7 @@ TIMER_TICK = global_config.get_garbage_collector_timer_interval()  # seconds
 
 __author__ = 'Iván de Paz Centeno'
 
+
 def segment(l, count):
     b = 0
     blocks = len(l) // count
@@ -41,6 +41,7 @@ def segment(l, count):
 
     if len(l) % count > 0:
         yield l[(blocks)*count:]
+
 
 def progress(current, max, string):
     print("\r[{:05.2f}%] {}/{} - {}                  "
@@ -95,7 +96,6 @@ class GarbageCollector(object):
         sleep_batch=50
         files_per_second = [0]
         files_per_second_avg = 0
-        time_remaining = -1
 
         with Measure() as timing:
             for index, file in enumerate(self.storage):
@@ -127,7 +127,7 @@ class GarbageCollector(object):
     def do_garbage_collect(self):
         print("[GC] Collecting garbage...")
 
-        global_config.session.clear()
+        global_config.get_session().clear()
 
         # 1. We retrieve the unused files.
         unused_files = self.collect_unused_files()
