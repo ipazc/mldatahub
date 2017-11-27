@@ -68,7 +68,7 @@ class TestFileLogger(unittest.TestCase):
 
         sleep(15)
 
-        self.assertEqual(self.pf['file.log'].decode(), "\r[INFO] [MAIN] HELLO1\n\r[DEBUG] [MAIN] HELLO2\n\r[ERROR] [MAIN] HELLO3\n\r[WARNING] [MAIN] HELLO4\n")
+        self.assertIn("\r[INFO] [MAIN] HELLO1\n\r[DEBUG] [MAIN] HELLO2\n\r[ERROR] [MAIN] HELLO3\n\r[WARNING] [MAIN] HELLO4\n", self.pf['file.log'].decode())
 
     def test_file_logger_generates_output_file_finish_wait(self):
         """
@@ -83,7 +83,7 @@ class TestFileLogger(unittest.TestCase):
 
         logger.file_logger.finish(True)
 
-        self.assertEqual(self.pf['file.log'].decode(), "\r[INFO] [MAIN] HELLO1\n\r[DEBUG] [MAIN] HELLO2\n\r[ERROR] [MAIN] HELLO3\n\r[WARNING] [MAIN] HELLO4\n")
+        self.assertIn("\r[INFO] [MAIN] HELLO1\n\r[DEBUG] [MAIN] HELLO2\n\r[ERROR] [MAIN] HELLO3\n\r[WARNING] [MAIN] HELLO4\n", self.pf['file.log'].decode())
 
     def tearDown(self):
         del self.pf['file.log']

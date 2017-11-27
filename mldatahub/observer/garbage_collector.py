@@ -104,7 +104,7 @@ class GarbageCollector(object):
 
                 self.do_garbage_collect()
             sleep(1)
-        i("[GC] Exited.")
+        i("Exited.")
 
     def collect_unused_files(self):
         """
@@ -115,7 +115,7 @@ class GarbageCollector(object):
 
         files_count = len(self.storage)
 
-        i("[GC] {} files to be checked.".format(files_count))
+        i("{} files to be checked.".format(files_count))
 
         sleep_batch=50
         files_per_second = [0]
@@ -149,7 +149,7 @@ class GarbageCollector(object):
         return unused_files
 
     def do_garbage_collect(self):
-        i("[GC] Collecting garbage...")
+        i("Collecting garbage...")
 
         global_config.get_session().clear()
 
@@ -159,9 +159,9 @@ class GarbageCollector(object):
         # 2. We check how many unused files are in common with the previous unused files.
         new_unused_files = []
         remove_files = []
-        i("[GC] Comparing {} unused files to previous {} unused files.".format(len(unused_files), len(self.previous_unused_files)))
+        i("Comparing {} unused files to previous {} unused files.".format(len(unused_files), len(self.previous_unused_files)))
 
-        i("[GC] Cleaning {} elements...".format(len(remove_files)))
+        i("Cleaning {} elements...".format(len(remove_files)))
 
         for index, file in enumerate(unused_files):
             if file in self.previous_unused_files:
@@ -179,7 +179,7 @@ class GarbageCollector(object):
 
         self.previous_unused_files = set(new_unused_files)
 
-        i("[GC] Cleaned {} elements...".format(len(remove_files)))
+        i("Cleaned {} elements...".format(len(remove_files)))
 
         return files_count
 

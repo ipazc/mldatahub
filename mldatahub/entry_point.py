@@ -28,6 +28,7 @@ import mldatahub
 from mldatahub.config.config import global_config
 import argparse
 
+
 __author__ = "Iván de Paz Centeno"
 
 
@@ -186,7 +187,10 @@ def build_app():
 def deploy():
     app = build_app()
     global_config.print_config()
+    from mldatahub.log.logger import Logger
+    logger = Logger(verbosity_level=global_config.get_log_verbosity(), log_file=global_config.get_log_file())
     app.run(host=global_config.get_host(), port=global_config.get_port(), debug=False, threaded=True)
+    logger.file_logger.finish(True)
 
 
 def deploy_gc():
@@ -194,11 +198,14 @@ def deploy_gc():
         print('CTRL+C detected. Exiting...')
 
     from mldatahub.observer.garbage_collector import GarbageCollector
+    from mldatahub.log.logger import Logger
+    logger = Logger(verbosity_level=global_config.get_log_verbosity(), log_file=global_config.get_log_file())
     garbage_collector = GarbageCollector()
-    print("Collecting garbage... hit CTRL+C to close this safely.\n Closing safely this process is **highly recommended**.")
+    logger.info("Collecting garbage... hit CTRL+C to close this safely.\n Closing safely this process is **highly recommended**.")
     signal.signal(signal.SIGINT, signal_handler)
     signal.pause()
     garbage_collector.stop()
+    logger.file_logger.finish(True)
 
 
 if __name__ == '__main__':
