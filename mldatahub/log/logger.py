@@ -117,5 +117,5 @@ class Logger(object):
     def __output__(self, level, same_line, string):
         end = "" if same_line else "\n"
         line = self.__generate_main_message__(level).format(self.module_name, string)
-        self.file_logger.queue_line(line+end, same_line)
+        self.file_logger.queue_line(line, same_line)
         print(line, end=end, flush=True)

@@ -53,7 +53,10 @@ class FileLog(object):
     def queue_line(self, string, same_line=False):
         with self.__lock:
             if same_line:
-                self.__buffer[-1] = string
+                if len(self.__buffer) == 0:
+                    self.__buffer.append(string)
+                else:
+                    self.__buffer[-1] = string
             else:
                 self.__buffer.append(string)
 
@@ -95,7 +98,7 @@ class FileLog(object):
         with self.__lock:
             if len(self.__buffer) > 0:
                 with open(self.__file_uri, "a+") as f:
-                    chars_written = f.write("".join(self.__buffer))
+                    chars_written = f.write("\n".join(self.__buffer))
                     self.__buffer = []
 
 file_logger = FileLog()

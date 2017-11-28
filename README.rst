@@ -7,6 +7,9 @@ mldatahub 0.0.1
 .. image:: https://travis-ci.org/ipazc/mldatahub.svg?branch=master
     :target: https://travis-ci.org/ipazc/mldatahub
 
+.. image:: https://coveralls.io/repos/github/ipazc/mldatahub/badge.svg?branch=master
+    :target: https://coveralls.io/github/ipazc/mldatahub?branch=master
+
 This is still a work in progress. It is expected to achieve a Proof Of Concept during December 2017.
 
 =====
