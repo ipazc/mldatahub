@@ -46,7 +46,7 @@ e = logger.error
 w = logger.warning
 
 
-class Backuper(object):
+class FileBackuper(object):
     """
     Base class for backupers.
     """

@@ -24,7 +24,7 @@ import json
 from pygfolder import PyGFolder
 from pyzip import PyZip
 from mldatahub.config.config import global_config
-from mldatahub.backup.backuper import Backuper
+from mldatahub.backup.filebackuper import FileBackuper
 from mldatahub.helper.timing_helper import now
 from mldatahub.log.logger import Logger
 
@@ -56,10 +56,10 @@ def as_bytes(c):
     return result
 
 
-class GoogleDriveBackuper(Backuper):
+class GoogleDriveFileBackuper(FileBackuper):
 
     def __init__(self, storage=None):
-        Backuper.__init__(self, storage=storage)
+        FileBackuper.__init__(self, storage=storage)
 
 
         drive_folder = global_config.get_google_drive_folder()
@@ -88,12 +88,6 @@ class GoogleDriveBackuper(Backuper):
 
         # We must store these data in the backend.
         try:
-            d("Storing a packet of size {}".format(len(packet)))
-            content = PyZip(packet).to_bytes(True)
-            d("Compressed into {} bytes".format(len(content)))
-            self.pygfolder["files/contents/"+name] = content
-            d("Saved into GDrive: {}".format(name))
-
             # We must write the index reference.
             # How to do that?
             # We pick the [0:-3] elements' id as the hash of the index file that contains it.
@@ -116,9 +110,11 @@ class GoogleDriveBackuper(Backuper):
             # 1. Get the id of the hash for elements holders
             hashes = {id[:-3] for id in packet}
 
-            d("Creating {} hash tables".format(len(hashes)))
 
-            #  2. Update the indexes for the hashes:
+            # 2. Update the indexes for the hashes:
+            index_tables = {}
+            recrafted_packet = {}
+
             for hash in hashes:
                 try:
                     index_table = json.loads(self.pygfolder["files/indexes/"+hash].decode())
@@ -127,12 +123,36 @@ class GoogleDriveBackuper(Backuper):
                     index_table = {}
 
                 if len(index_table) > 0:
-                    d("Appending to an existing index... ({} previous elements)".format(len(index_table)))
+                    d("Found previous index for hash {}... ({} previous elements)".format(hash, len(index_table)))
 
-                index_table.update({id: name for id in packet if id.startswith(hash)})
+                # Some of the files might be already stored in the drive. Let's check which files are not stored yet.
+                recrafted_packet.update({file_id: content for file_id, content in packet.items() if file_id not in index_table and file_id.startswith(hash)})
+                recrafted_index_table = {id: name for id in recrafted_packet if id.startswith(hash)}
 
-                self.pygfolder["files/indexes/"+hash] = json.dumps(index_table).encode()
-                d("Saved index table into hash {}".format(hash))
+                if len(recrafted_index_table) > 0:
+                    index_table.update({id: name for id in packet if id.startswith(hash)})
+
+                    d("Generated new table for hash {}".format(hash))
+                    index_tables["files/indexes/"+hash] = json.dumps(index_table).encode()
+                else:
+                    d("Skipped index table {} because no elements are appended to it".format(hash))
+
+            if len(recrafted_packet) > 0:
+
+                d("Storing a packet of size {}".format(len(recrafted_packet)))
+                content = PyZip(recrafted_packet).to_bytes(True)
+                d("Compressed into {} bytes".format(len(content)))
+                self.pygfolder["files/contents/"+name] = content
+                d("Saved into GDrive: {}".format(name))
+
+                # Finally we save the indexes
+                for index_table_id, index_table in index_tables.items():
+                    self.pygfolder[index_table_id] = index_table
+
+                d("Stored {} index tables in backend".format(len(index_tables)))
+
+            if len(recrafted_packet) < len(packet):
+                d("{} files skipped (duplicated in backend)".format(len(packet) - len(recrafted_packet)))
 
         finally:
             self._decrease_tasks_count(len(packet))
@@ -167,7 +187,7 @@ class GoogleDriveBackuper(Backuper):
             packet = {str(file_id): {'content': table_content[str(file_id)], 'count': 1} for file_id in file_ids_list}
 
         except KeyError as ex:
-            packet = {str(file_id): {'content': "", 'count': 1, 'error': str(ex)} for file_id in file_ids_list}
+            packet = {str(file_id): {'content': "hola: "+str(ex), 'count': 1, 'error': str(ex)} for file_id in file_ids_list}
 
         finally:
             self._decrease_tasks_count(len(file_ids_list))
