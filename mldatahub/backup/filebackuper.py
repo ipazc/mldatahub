@@ -25,8 +25,9 @@ from multiprocessing import Queue, Lock
 from queue import Empty
 from threading import Thread
 from time import sleep
-from bson import ObjectId
-from mldatahub.helper.timing_helper import Measure
+from bson import ObjectId, BSON
+from mldatahub.odm.dataset_dao import DatasetDAO, DatasetElementDAO
+from mldatahub.helper.timing_helper import Measure, now
 from mldatahub.config.config import global_config
 from mldatahub.log.logger import Logger
 
@@ -46,41 +47,12 @@ e = logger.error
 w = logger.warning
 
 
-class FileBackuper(object):
+class MultiprocessingTaskedObject(object):
     """
-    Base class for backupers.
+    Base class for counting tasks
     """
-
-    # Tasks being done by the object
     __tasks_num = 0
-
-    # Multithreading Lock
-    __lock = Lock()
-
-    # Finish flag for stopping the the internal threads
-    __finish = False
-
-    # Flag for waiting for finish when __finish flag is True
-    __wait_finish = True
-
-    # Queue for storing backups
-    __backup_data_queue = Queue()
-
-    # Queue for restoring backups
-    __restore_data_queue = Queue()
-
-    # Multithreading Lock for files
-    __files_lock = Lock()
-
-    # Temporal storage cache
-    __temp_storage = {}
-
-    # Thread pool for downloads.
-    __download_pool = ThreadPoolExecutor(2)
-
-    """
-    GETTERS
-    """
+    __tasks_lock = Lock()
 
     @property
     def tasks_count(self):
@@ -88,8 +60,56 @@ class FileBackuper(object):
         Getter for the tasks_count
         :return: number of tasks remaining for this object.
         """
-        with self.__lock:
+        with self.__tasks_lock:
             return self.__tasks_num
+
+    def _increase_tasks_count(self, value=1):
+        """
+        Increases the tasks count by the specified value
+        :param value: number of tasks to increase the tasks count.
+        """
+        with self.__tasks_lock:
+            self.__tasks_num += value
+
+    def _decrease_tasks_count(self, value=1):
+        """
+        Decreases the tasks count by the specified value
+        :param value: number of tasks to decrease the tasks count.
+        """
+        with self.__tasks_lock:
+            self.__tasks_num -= value
+
+    def sync(self):
+        """
+        Synchronizes the object until no more tasks are queued.
+        :return:
+        """
+        tasks_remaining = self.tasks_count
+
+        while tasks_remaining > 0:
+
+            i("Tasks remaining: {}".format(tasks_remaining), same_line=True)
+            tasks_remaining = self.tasks_count
+            sleep(0.5)
+        i("Tasks remaining: {}".format(tasks_remaining), same_line=False)
+
+
+class MultiprocessingStoppableObject(object):
+    """
+    Base class for allowing stop in multiprocessing classes.
+    """
+    # Finish flag for stopping the the internal threads
+    __finish = False
+
+    # Flag for waiting for finish when __finish flag is True
+    __wait_finish = True
+
+    # Global Lock for flags.
+    __lock = Lock()
+
+    """
+    GETTERS
+    """
 
     @property
     def is_exit_requested(self):
@@ -108,6 +128,27 @@ class FileBackuper(object):
         """
         with self.__lock:
             return self.__wait_finish
+
+
+class FileBackuper(MultiprocessingTaskedObject, MultiprocessingStoppableObject):
+    """
+    Base class for backupers.
+    """
+
+    # Queue for storing backups
+    __backup_data_queue = Queue()
+
+    # Queue for restoring backups
+    __restore_data_queue = Queue()
+
+    # Multithreading Lock for files
+    __files_lock = Lock()
+
+    # Temporal storage cache
+    __temp_storage = {}
+
+    # Thread pool for downloads.
+    __download_pool = ThreadPoolExecutor(2)
 
     """
     METHODS
@@ -128,22 +169,6 @@ class FileBackuper(object):
         self.downloader = Thread(target=self.__downloader__, daemon=True)
         self.uploader.start()
         self.downloader.start()
-
-    def _increase_tasks_count(self, value=1):
-        """
-        Increases the tasks count by the specified value
-        :param value: number of tasks to increase the tasks count.
-        """
-        with self.__lock:
-            self.__tasks_num += value
-
-    def _decrease_tasks_count(self, value=1):
-        """
-        Decreases the tasks count by the specified value
-        :param value: number of tasks to decrease the tasks count.
-        """
-        with self.__lock:
-            self.__tasks_num -= value
 
 
     """
@@ -296,16 +321,16 @@ class FileBackuper(object):
             file_content = None
 
             while file_content is None:
-                with self.__files_lock:
-                    try:
+                try:
+                    with self.__files_lock:
                         file_content = self.__temp_storage[file_id]['content']
                         self.__temp_storage[file_id]['count'] -= 1
 
                         if self.__temp_storage[file_id]['count'] == 0:
                             del self.__temp_storage[file_id]
 
-                    except KeyError:
-                        sleep(0.5)
+                except KeyError:
+                    sleep(0.5)
 
             return file_content
 
@@ -318,20 +343,6 @@ class FileBackuper(object):
         future = self.__download_pool.submit(check_restore_file, file_id)
 
         return future
-
-    def sync(self):
-        """
-        Synchronizes the backuper until no more tasks are queued.
-        :return:
-        """
-        tasks_remaining = self.tasks_count
-
-        while tasks_remaining > 0:
-
-            i("Tasks remaining: {}".format(tasks_remaining), same_line=True)
-            tasks_remaining = self.tasks_count
-            sleep(0.5)
-        i("Tasks remaining: {}".format(tasks_remaining), same_line=False)
 
     def __store_packet__(self, packet, name):
         """
@@ -349,3 +360,183 @@ class FileBackuper(object):
         :return: files packet. It is a dict with format FileID -> Content
         """
         return {}
+
+
+class DatasetBackuper(MultiprocessingTaskedObject, MultiprocessingStoppableObject):
+    """
+    Backups a whole dataset
+    """
+    __backuper_pool = ThreadPoolExecutor(1)
+    __backup_start = now()
+
+    def __init__(self, file_backuper: FileBackuper):
+        """
+        Constructor of the class.
+        The dataset backuper require a file backuper to store the files.
+        :param file_backuper: FileBackuper to store the files.
+        """
+        self.file_backuper = file_backuper
+
+    def __full_serialization(self, dataset: DatasetDAO):
+        """
+        Serializes the whole dataset into BSON format, including the elements (but not their content).
+        The serial returned by this method represents the full dataset, and can be reverted back to the original
+        database format.
+
+        Warning!!: The content of the Dataset Elements is not included!
+
+        :param dataset: DatasetDAO to fully serialize.
+
+        :return: A tuple of 3 elements:\n
+                \b1) BSON Serial of the dataset,\n
+                \b2) List of elements' file-refs IDs. Useful to know which files should be stored along with this serial.\n
+                \b3) header of the dataset (id, url prefix, title, description, dates, tags, ...)\n
+        """
+        header_serial = {
+            '_id': str(dataset._id),
+            'url_prefix': dataset.url_prefix,
+            'title': dataset.title,
+            'description': dataset.description,
+            'reference': dataset.reference,
+            'creation_date': dataset.creation_date,
+            'modification_date': dataset.modification_date,
+            'size': dataset.size,
+            'tags': dataset.tags,
+            'fork_count': dataset.fork_count,
+            'forked_from_id': str(dataset.forked_from_id)
+        }
+
+        elements = [
+            {
+                '_id': element._id,
+                '_previous_id': element._previous_id,
+                'title': element.title,
+                'description': element.description,
+                'file_ref_id': element.file_ref_id,
+                'http_ref': element.http_ref,
+                'tags': element.tags,
+                'addition_date': element.addition_date,
+                'modification_date': element.modification_date,
+                'dataset_id': element.dataset_id
+            } for element in dataset.elements
+        ]
+
+        dataset_serial = {
+            'header': header_serial,
+            'elements': elements
+        }
+
+        return BSON.encode(dataset_serial), [element['file_ref_id'] for element in elements], header_serial
+
+    def __full_deserialization(self, dataset_serial):
+        """
+        Fully deserializes a dataset serial, previously serialized with __full_serialization().
+        Warning!! if the dataset ID already exists, it should be deleted first!
+
+        Warning!!: The content of the Dataset Elements is not included!
+
+        :param dataset_serial: BSON serial of a dataset
+        :return: DatasetDAO
+        """
+        decoded_dataset = BSON.decode(dataset_serial)
+        dataset_header = decoded_dataset['header']
+
+        dataset = DatasetDAO(
+            url_prefix=dataset_header['url_prefix'],
+            title=dataset_header['title'],
+            description=dataset_header['description'],
+            reference=dataset_header['reference'],
+            tags=dataset_header['tags'],
+            creation_date=dataset_header['creation_date'],
+            modification_date=dataset_header['modification_date'],
+            fork_count=dataset_header['fork_count'],
+            forked_from_id = dataset_header['forked_from_id']
+        )
+
+        dataset._id = dataset_header['_id']
+
+        elements = []
+        for element_data in decoded_dataset['elements']:
+            element = DatasetElementDAO(
+                title=element_data['title'],
+                description=element_data['description'],
+                file_ref_id=element_data['file_ref_id'],
+                http_ref=element_data['http_ref'],
+                tags=element_data['tags'],
+                addition_date=element_data['addition_date'],
+                modification_date=element_data['modification_date'],
+                dataset_id=dataset._id
+            )
+            element._id = element_data['_id']
+            element._previous_id = element_data['_previous_id']
+            elements.append(element)
+
+        return dataset
+
+    def backup_dataset(self, dataset:DatasetDAO):
+        """
+        Backups a dataset into the backend.
+        :param dataset:
+        :return:
+        """
+        i("Backuping dataset {}.".format(dataset.url_prefix))
+        binary, file_ids, header_serial = self.__full_serialization(dataset)
+        d("Serialized dataset {}.".format(dataset.url_prefix))
+
+        name = header_serial['url_prefix']
+        body = binary
+        self._increase_tasks_count()
+        d("Queued dataset {} to store.".format(dataset.url_prefix))
+        self._store_dataset_(name, body)
+
+        d("Backuping its files...")
+        for file in file_ids:
+            self.file_backuper.backup_file(file)
+
+    def restore_dataset(self, dataset_url_prefix, date=None) -> DatasetDAO:
+        """
+        Restores the specified dataset to the specified date
+        :param dataset_url_prefix:
+        :param date:
+        :return:
+        """
+        date_msg = "latest" if date is None else str(date)
+
+        i("Restoring dataset of url prefix {} from date {}".format(dataset_url_prefix, date_msg))
+        previous_dataset = DatasetDAO.query.find(url_prefix=dataset_url_prefix)
+
+        if previous_dataset is not None:
+            d("Deleting previous dataset ({})".format(previous_dataset.url_prefix))
+            previous_dataset.delete()
+        else:
+            d("No previous dataset found.")
+
+        dataset_serial = self._retrieve_dataset_(dataset_url_prefix, date)
+
+        d("Generating new dataset...")
+        dataset = self.__full_deserialization(dataset_serial)
+        d("Generated dataset from serial.")
+        global_config.get_session().flush()
+
+        d("Computing files from dataset that are missing...")
+        storage = global_config.get_storage()
+
+        #storage.
+        d("Queueing restore of files")
+        # TODO: Queue the file restore process in background
+        #self.file_backuper
+        return dataset
+
+    def get_available_dates(self, dataset_url_prefix) -> list:
+        """
+        Retrieves the available backup dates for a given dataset url prefix
+        :param dataset_url_prefix: the full dataset url prefix,
+        :return: list of dates in string format (YYYYMMDD)
+        """
+        pass
+
+    def _store_dataset_(self, name, body):
+        pass
+
+    def _retrieve_dataset_(self, name, date):
+        pass

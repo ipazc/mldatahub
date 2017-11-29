@@ -146,6 +146,58 @@ class TestMongoStorage(unittest.TestCase):
         self.assertEqual(file_id, file_id2)
         self.assertNotEqual(file_id, file_id3)
 
+    def test_storage_force_ids(self):
+        """
+        Storage can be forced to set custom ids to files.
+        :return:
+        """
+        content1 = b"content1"
+        content2 = b"content2"
+        content3 = b"content3"
+        content4 = b"content4"
+
+        storage = MongoStorage()
+        file_id = storage.put_file_content(content1, force_id=ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"))
+
+        self.assertEqual(file_id, ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"))
+
+        file_id = storage.put_file_content(content1, force_id=ObjectId("bbbbbbbbbbbbbbbbbbbbbbb1"))
+
+        self.assertEqual(file_id, ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"))
+
+        file_id = storage.put_file_content(content2, force_id=ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"))
+
+        self.assertEqual(file_id, ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"))
+
+        file_id = storage.put_file_content(content1)
+
+        self.assertNotEqual(file_id, ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"))
+        self.assertNotEqual(file_id, ObjectId("bbbbbbbbbbbbbbbbbbbbbbb1"))
+
+        storage.delete_file(file_id)
+        storage.delete_file(ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"))
+
+        file_ids = storage.put_files_contents([content1, content2], force_ids=[ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbb1")])
+
+        self.assertEqual(file_ids, [ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbb1")])
+
+        file_ids = storage.put_files_contents([content1, content3], force_ids=[ObjectId("bbbbbbbbbbbbbbbbbbbbbbb1"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbb1")])
+
+        self.assertEqual(file_ids, [ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbb1")])
+
+        file_ids = storage.put_files_contents([content1, content3])
+
+        self.assertEqual(file_ids, [ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbb1")])
+
+        file_ids = storage.put_files_contents([content2])
+        self.assertNotIn(file_ids[0], [ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbb1")])
+
+        storage.delete_files(file_ids)
+        storage.delete_files([ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbb1")])
+
+        file_ids = storage.put_files_contents([content3, content2, content1], force_ids=[ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbb1"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbb2")])
+        self.assertEqual(file_ids, [ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbb1"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbb2")])
+
     def tearDown(self):
         FileDAO.query.remove()
 

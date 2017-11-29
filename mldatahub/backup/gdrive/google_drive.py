@@ -110,7 +110,6 @@ class GoogleDriveFileBackuper(FileBackuper):
             # 1. Get the id of the hash for elements holders
             hashes = {id[:-3] for id in packet}
 
-
             # 2. Update the indexes for the hashes:
             index_tables = {}
             recrafted_packet = {}
@@ -191,6 +190,5 @@ class GoogleDriveFileBackuper(FileBackuper):
 
         finally:
             self._decrease_tasks_count(len(file_ids_list))
-
 
         return packet
