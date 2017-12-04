@@ -163,7 +163,7 @@ class GlobalConfig(object):
         """
         try:
             pyfolder = PyFolder(DEFAULT_CONFIG_ROUTE)
-            self.config_values = pyfolder['config.json']
+            self.__config = pyfolder['config.json']
         except PermissionError as ex:
             w("There is no permission to access the config file. Running on default values.")
         except KeyError as ex:
@@ -174,7 +174,7 @@ class GlobalConfig(object):
         Makes a string representation of the config. Each key is printed with its corresponding value.
         """
         result = ""
-        for k, v in self.config_values.items():
+        for k, v in self.__config.items():
             if not k.startswith("#"):
                 result += "{}: {}\n".format(k, v)
 
