@@ -8,8 +8,7 @@ __pycache__/
 
 # Custom
 examples/
-debug.py
-debug2.py
+debug*.py
 file_list.json
 
 # Distribution / packaging

@@ -20,12 +20,13 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from multiprocessing import Queue, Lock
 from queue import Empty
 from threading import Thread
 from time import sleep
 from bson import ObjectId, BSON
+from mldatahub.odm.token_dao import TokenDAO
 from mldatahub.odm.dataset_dao import DatasetDAO, DatasetElementDAO
 from mldatahub.helper.timing_helper import Measure, now
 from mldatahub.config.config import global_config
@@ -362,12 +363,12 @@ class FileBackuper(MultiprocessingTaskedObject, MultiprocessingStoppableObject):
         return {}
 
 
-class DatasetBackuper(MultiprocessingTaskedObject, MultiprocessingStoppableObject):
+class DatasetBackuper():
     """
     Backups a whole dataset
     """
     __backuper_pool = ThreadPoolExecutor(1)
-    __backup_start = now()
+    _backup_start = now()
 
     def __init__(self, file_backuper: FileBackuper):
         """
@@ -436,7 +437,8 @@ class DatasetBackuper(MultiprocessingTaskedObject, MultiprocessingStoppableObjec
         Warning!!: The content of the Dataset Elements is not included!
 
         :param dataset_serial: BSON serial of a dataset
-        :return: DatasetDAO
+
+        :return: Tuple -> (DatasetDAO, list of elements)
         """
         decoded_dataset = BSON.decode(dataset_serial)
         dataset_header = decoded_dataset['header']
@@ -449,9 +451,11 @@ class DatasetBackuper(MultiprocessingTaskedObject, MultiprocessingStoppableObjec
             tags=dataset_header['tags'],
             creation_date=dataset_header['creation_date'],
             modification_date=dataset_header['modification_date'],
-            fork_count=dataset_header['fork_count'],
-            forked_from_id = dataset_header['forked_from_id']
+            fork_count=dataset_header['fork_count']
         )
+
+        if dataset_header['forked_from_id'] not in [None, "None"]:
+            dataset.forked_from_id = dataset_header['forked_from_id']
 
         dataset._id = dataset_header['_id']
 
@@ -471,7 +475,7 @@ class DatasetBackuper(MultiprocessingTaskedObject, MultiprocessingStoppableObjec
             element._previous_id = element_data['_previous_id']
             elements.append(element)
 
-        return dataset
+        return dataset, elements
 
     def backup_dataset(self, dataset:DatasetDAO):
         """
@@ -480,14 +484,14 @@ class DatasetBackuper(MultiprocessingTaskedObject, MultiprocessingStoppableObjec
         :return:
         """
         i("Backuping dataset {}.".format(dataset.url_prefix))
-        binary, file_ids, header_serial = self.__full_serialization(dataset)
+        dataset_serial, file_ids, header_serial = self.__full_serialization(dataset)
         d("Serialized dataset {}.".format(dataset.url_prefix))
 
-        name = header_serial['url_prefix']
-        body = binary
-        self._increase_tasks_count()
+        dataset_url_prefix = header_serial['url_prefix']
+        body = dataset_serial
+
         d("Queued dataset {} to store.".format(dataset.url_prefix))
-        self._store_dataset_(name, body)
+        self._store_dataset_(dataset_url_prefix, body)
 
         d("Backuping its files...")
         for file in file_ids:
@@ -495,15 +499,15 @@ class DatasetBackuper(MultiprocessingTaskedObject, MultiprocessingStoppableObjec
 
     def restore_dataset(self, dataset_url_prefix, date=None) -> DatasetDAO:
         """
-        Restores the specified dataset to the specified date
+        Restores the specified dataset to the specified date.
         :param dataset_url_prefix:
         :param date:
         :return:
         """
         date_msg = "latest" if date is None else str(date)
 
-        i("Restoring dataset of url prefix {} from date {}".format(dataset_url_prefix, date_msg))
-        previous_dataset = DatasetDAO.query.find(url_prefix=dataset_url_prefix)
+        i("Restoring dataset of url prefix {} from date '{}'".format(dataset_url_prefix, date_msg))
+        previous_dataset = DatasetDAO.query.get(url_prefix=dataset_url_prefix)
 
         if previous_dataset is not None:
             d("Deleting previous dataset ({})".format(previous_dataset.url_prefix))
@@ -514,18 +518,61 @@ class DatasetBackuper(MultiprocessingTaskedObject, MultiprocessingStoppableObjec
         dataset_serial = self._retrieve_dataset_(dataset_url_prefix, date)
 
         d("Generating new dataset...")
-        dataset = self.__full_deserialization(dataset_serial)
+        dataset, elements = self.__full_deserialization(dataset_serial)
         d("Generated dataset from serial.")
+        files_ref_ids = [e.file_ref_id for e in elements]
+
+        d("Queueing... restore of files")
+        new_file_refs = self.__push_files_to_storage(files_ref_ids)
+
+        d("Finished restoring {} files. Found {} ids to require update in the dataset".format(len(files_ref_ids), len(new_file_refs)))
+        d("Updating ids...")
+
+        for element in elements:
+            if element.file_ref_id in new_file_refs:
+                element.file_ref_id = new_file_refs[element.file_ref_id]
+
+        d("Ids successfully updated.")
+
+        # TODO: Store the tokens associated to this one.
+
         global_config.get_session().flush()
+        d("Flushing...")
 
-        d("Computing files from dataset that are missing...")
-        storage = global_config.get_storage()
-
-        #storage.
-        d("Queueing restore of files")
-        # TODO: Queue the file restore process in background
-        #self.file_backuper
         return dataset
+
+    def __push_files_to_storage(self, files_ref_ids: list):
+        """
+        Restores the specified files from the backup to the storage.
+        Files are indexed by their SHA256 hash. Whenever a file is already found, they won't be updated.
+
+        :param files_ref_ids: list of file ref ids to restore
+        :return:
+        """
+        d("Queued {} files to restore".format(len(files_ref_ids)))
+        futures = {self.file_backuper.restore_file(file_ref_id): file_ref_id for file_ref_id in files_ref_ids}
+        # Let's do it in batches
+        results = []
+        ps = global_config.get_page_size()
+        storage = global_config.get_storage() # type: MongoStorage
+        d("Restoring in batches of {} files into storage".format(ps))
+
+        # This dict holds all the file_ref_IDs that should be overriden
+        override_ids = {}
+
+        for future in as_completed(futures):
+            results.append({futures[future]: future.result()})
+
+            if len(results) > 0 and len(results) % ps == 0:
+                ids = [k for k in results]
+                values = [results[k] for k in ids]
+
+                list_of_ids = storage.put_files_contents(ids, force_ids=values)
+
+                # We need to check which file ref ids have not been replaced.
+                override_ids.update({old_id: new_id for old_id, new_id in zip(ids, list_of_ids)})
+
+        return override_ids
 
     def get_available_dates(self, dataset_url_prefix) -> list:
         """
@@ -535,8 +582,8 @@ class DatasetBackuper(MultiprocessingTaskedObject, MultiprocessingStoppableObjec
         """
         pass
 
-    def _store_dataset_(self, name, body):
+    def _store_dataset_(self, url_prefix, body):
         pass
 
-    def _retrieve_dataset_(self, name, date):
+    def _retrieve_dataset_(self, url_prefix, date):
         pass
