@@ -981,6 +981,43 @@ class TestDatasetElementFactory(unittest.TestCase):
 
         print(forked_dataset.elements[0].title)
 
+    def test_dataset_element_serialization(self):
+        """
+        Tests that the element serialization works correctly
+        :return:
+        """
+        editor = TokenDAO("normal user privileged with link", 100, 200, "user1",
+                     privileges=Privileges.RO_WATCH_DATASET + Privileges.CREATE_DATASET + Privileges.EDIT_DATASET +
+                                Privileges.ADD_ELEMENTS + Privileges.EDIT_ELEMENTS + Privileges.DESTROY_ELEMENTS
+                 )
+
+        main_dataset = DatasetFactory(editor).create_dataset(url_prefix="foobar", title="foo", description="bar",
+                                                             reference="none", tags=["a"])
+
+        editor = editor.link_dataset(main_dataset)
+
+        elements_proto = [{
+            'title': 't{}'.format(i),
+            'description': 'desc{}'.format(i),
+            'http_ref': 'none',
+            'tags': ['none'],
+            'content': "content{}".format(i).encode()
+        } for i in range(4)]
+
+        elements = [DatasetElementFactory(editor, main_dataset).create_element(**element_proto) for element_proto in elements_proto]
+        self.session.flush()
+
+        self.assertEqual(len(elements), len(main_dataset.elements))
+
+        serial = elements[0].serialize()
+
+        valid_classes = [str, int, float, bool, dict, list, set]
+
+        for k, v in serial.items():
+            self.assertIn(type(v), valid_classes)
+
+        self.assertNotIn("previous_id", serial)
+
     def tearDown(self):
         DatasetDAO.query.remove()
         DatasetCommentDAO.query.remove()

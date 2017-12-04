@@ -172,7 +172,7 @@ class DatasetElementDAO(MappedClass):
         name = 'element'
 
     _id = FieldProperty(schema.ObjectId)
-    _previous_id = FieldProperty(schema.ObjectId)
+    _previous_id = FieldProperty(schema.ObjectId(if_missing=None))
     title = FieldProperty(schema.String)
     description = FieldProperty(schema.String)
     file_ref_id = ForeignIdProperty('FileDAO')
@@ -250,7 +250,7 @@ class DatasetElementDAO(MappedClass):
         response = {f: str(self[f]) for f in fields}
 
         if self._previous_id is not None:
-            response['previous_id'] = self._previous_id
+            response['previous_id'] = str(self._previous_id)
 
         response['comments_count'] = len(self.comments)
         response['has_content'] = self.file_ref_id is not None
